@@ -17,6 +17,10 @@ próprios, em português). Feito com Next.js + Supabase + Cloudflare R2 + Stripe
   print físico em tamanho específico), checkout via Stripe, liberação do
   link de download assinado depois do pagamento confirmado (webhook).
 - **Portfólio público** — lista as galerias marcadas como "publicadas".
+- **Assinatura SaaS** — o fotógrafo assina um de três planos (Essencial,
+  Profissional, Estúdio) pra usar a plataforma, via Stripe Billing
+  (`/precos`, `/painel/assinatura`), separado do checkout avulso do cliente
+  final.
 
 ## Limitações conhecidas desta v1 (próximos passos)
 
@@ -92,7 +96,33 @@ público) e um público (prévias com marca d'água):
      localhost:3000/api/webhooks/stripe` (Stripe CLI) pra testar sem
      precisar expor sua máquina.
 
-### 5. Configurando o Google Drive
+### 5. Configurando o Stripe (assinaturas)
+
+Além do checkout avulso (cliente final comprando fotos/prints, seção acima),
+a Titan Galeria cobra uma **mensalidade do fotógrafo** pra usar a ferramenta
+— três planos (Essencial, Profissional, Estúdio), sem comissão por venda.
+
+1. No [Catálogo de produtos](https://dashboard.stripe.com/test/products) do
+   Stripe, crie 3 produtos **recorrentes** (mensal, BRL): "Essencial",
+   "Profissional" e "Estúdio", com os valores que você quer cobrar.
+2. Copie o **Price ID** de cada um (`price_...`, aparece ao abrir o produto)
+   pro `.env.local`: `STRIPE_PRICE_ESSENCIAL`, `STRIPE_PRICE_PROFISSIONAL`,
+   `STRIPE_PRICE_ESTUDIO`. Os valores exibidos em `/precos` e no painel vêm
+   de `src/lib/plans.ts` — ajuste lá se mudar o preço.
+3. No mesmo endpoint de webhook do passo anterior (**Developers > Webhooks**),
+   adicione também os eventos `customer.subscription.created`,
+   `customer.subscription.updated` e `customer.subscription.deleted` (além
+   de `checkout.session.completed`) — usam o mesmo `STRIPE_WEBHOOK_SECRET`.
+4. Rode `supabase/migrations/0003_subscriptions.sql` no SQL Editor do
+   Supabase (adiciona as colunas de plano/assinatura em `photographers` e os
+   triggers que impõem os limites de cada plano no banco).
+
+> **Limitações conhecidas desta v1**: os limites de **armazenamento**
+> (10GB/100GB/ilimitado) e de **usuários/equipe** (até 5 logins no Estúdio)
+> do quadro de planos ainda não são reforçados automaticamente — só o
+> limite de galerias e de tipo de produto do plano Essencial.
+
+### 6. Configurando o Google Drive
 
 Os arquivos ORIGINAIS em alta resolução ficam no Google Drive (pasta própria
 por galeria), não no R2 — só os previews com marca d'água continuam no R2,
@@ -127,7 +157,7 @@ pra manter o custo de armazenamento baixo. Isso usa uma única conta de Drive
 > `drive_file_id`) continua funcionando normalmente — o download cai num
 > fallback que busca do R2.
 
-### 6. Rodando localmente
+### 7. Rodando localmente
 
 ```bash
 cp .env.example .env.local
@@ -135,7 +165,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-### 7. Deploy
+### 8. Deploy
 
 O jeito mais simples é [Vercel](https://vercel.com): conecte o repositório,
 configure as mesmas variáveis de ambiente do `.env.local` no painel do

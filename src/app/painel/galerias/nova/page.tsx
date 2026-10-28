@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyPlanError } from "@/lib/plans";
 
 function slugify(text: string) {
   return text
@@ -48,7 +49,7 @@ export default function NovaGaleriaPage() {
       .single();
 
     if (error) {
-      setErro(error.message);
+      setErro(friendlyPlanError(error.message) || error.message);
       setCarregando(false);
       return;
     }

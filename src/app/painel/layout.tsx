@@ -26,6 +26,9 @@ export default async function PainelLayout({ children }: { children: React.React
             <Link href="/painel/produtos" className="rounded-md px-3 py-2 hover:bg-neutral-100">
               Produtos
             </Link>
+            <Link href="/painel/assinatura" className="rounded-md px-3 py-2 hover:bg-neutral-100">
+              Assinatura
+            </Link>
             <Link
               href="/painel/configuracoes"
               className="rounded-md px-3 py-2 hover:bg-neutral-100"

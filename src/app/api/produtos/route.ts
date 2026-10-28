@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { friendlyPlanError } from "@/lib/plans";
 
 const bodySchema = z.object({
   type: z.enum(["download_single", "download_all", "print"]),
@@ -28,7 +29,11 @@ export async function POST(req: NextRequest) {
     print_size: type === "print" ? printSize : null,
   });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error)
+    return NextResponse.json(
+      { error: friendlyPlanError(error.message) || error.message },
+      { status: 400 }
+    );
   return NextResponse.json({ ok: true });
 }
 
@@ -46,6 +51,10 @@ export async function PATCH(req: NextRequest) {
     .eq("id", id)
     .eq("photographer_id", user.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error)
+    return NextResponse.json(
+      { error: friendlyPlanError(error.message) || error.message },
+      { status: 400 }
+    );
   return NextResponse.json({ ok: true });
 }

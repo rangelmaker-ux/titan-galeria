@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { publicPreviewUrl } from "@/lib/r2";
 import { PasswordGate } from "@/components/public/password-gate";
 import { ClientGalleryView } from "@/components/public/client-gallery-view";
+import { getPlan } from "@/lib/plans";
 
 export default async function GaleriaPublicaPage({
   params,
@@ -42,6 +43,13 @@ export default async function GaleriaPublicaPage({
     .eq("photographer_id", galeria.photographer_id)
     .eq("active", true);
 
+  const { data: fotografo } = await supabase
+    .from("photographers")
+    .select("plan")
+    .eq("id", galeria.photographer_id)
+    .single();
+  const marcaTitan = !getPlan(fotografo?.plan).marcaPropria;
+
   const midiasComUrl = (midias ?? []).map((m) => ({
     ...m,
     previewUrl: publicPreviewUrl(m.r2_key_preview!),
@@ -58,6 +66,7 @@ export default async function GaleriaPublicaPage({
       produtos={produtos ?? []}
       pedidoStatus={searchParams.pedido}
       orderId={searchParams.orderId}
+      marcaTitan={marcaTitan}
     />
   );
 }

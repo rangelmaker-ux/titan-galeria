@@ -27,7 +27,20 @@ type Props = {
   produtos: Produto[];
   pedidoStatus?: string;
   orderId?: string;
+  marcaTitan?: boolean;
 };
+
+function RodapeMarca({ marcaTitan }: { marcaTitan?: boolean }) {
+  if (!marcaTitan) return null;
+  return (
+    <p className="mt-8 pb-6 text-center text-xs text-neutral-400">
+      Feito com{" "}
+      <a href="https://titan-galeria.vercel.app" className="underline">
+        Titan Galeria
+      </a>
+    </p>
+  );
+}
 
 function formatarPreco(cents: number, currency: string) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: currency.toUpperCase() }).format(
@@ -44,6 +57,7 @@ export function ClientGalleryView({
   midias,
   pedidoStatus,
   orderId,
+  marcaTitan,
 }: Props) {
   const [identificador, setIdentificador] = useState<string | null>(null);
   const [nomeInput, setNomeInput] = useState("");
@@ -119,6 +133,7 @@ export function ClientGalleryView({
             Ver galeria
           </button>
         </form>
+        <RodapeMarca marcaTitan={marcaTitan} />
       </main>
     );
   }
@@ -206,6 +221,7 @@ export function ClientGalleryView({
           </div>
         ))}
       </div>
+      <RodapeMarca marcaTitan={marcaTitan} />
     </main>
   );
 }
