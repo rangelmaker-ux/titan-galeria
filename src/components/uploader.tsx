@@ -2,197 +2,90 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { jsonRequest, preparePhoto, sendBlob, uploadOriginal, type DriveSession } from "@/lib/upload-client";
 
-type Props = {
-  galleryId: string;
-  watermarkText: string;
-  watermarkEnabled: boolean;
-  plano?: string;
+type Props = { galleryId: string; watermarkText: string; watermarkEnabled: boolean; plano?: string };
+type Item = {
+  id: number; file: File; percent: number; phase: string; status: "waiting" | "sending" | "done" | "error";
+  error?: string; previewKey?: string; driveFileId?: string; session?: DriveSession; width?: number; height?: number;
 };
-
-const QUINZE_MB = 15 * 1024 * 1024;
-
-/** Gera uma versão reduzida (máx. 1600px) com marca d'água em diagonal,
- * desenhada num <canvas> — evita precisar de um pipeline de imagem no
- * servidor (sharp/ffmpeg) pra um MVP. Vídeo não é re-processado: ver nota
- * no README sobre a limitação de marca d'água em vídeo nesta versão. */
-async function gerarPreviewFoto(file: File, watermark: string | null): Promise<Blob> {
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const el = new Image();
-    el.onload = () => resolve(el);
-    el.onerror = reject;
-    el.src = URL.createObjectURL(file);
-  });
-
-  const maxW = 1600;
-  const scale = Math.min(1, maxW / img.width);
-  const canvas = document.createElement("canvas");
-  canvas.width = img.width * scale;
-  canvas.height = img.height * scale;
-  const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-  if (watermark) {
-    ctx.save();
-    ctx.globalAlpha = 0.18;
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `${Math.round(canvas.width / 18)}px sans-serif`;
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate(-Math.PI / 8);
-    ctx.textAlign = "center";
-    for (let y = -canvas.height; y < canvas.height; y += canvas.width / 4) {
-      ctx.fillText(watermark, 0, y);
-    }
-    ctx.restore();
-  }
-
-  return new Promise((resolve) =>
-    canvas.toBlob((blob) => resolve(blob!), "image/jpeg", 0.85)
-  );
-}
-
-async function presign(
-  galleryId: string,
-  fileName: string,
-  contentType: string,
-  variant: "original" | "preview"
-) {
-  const res = await fetch("/api/upload/presign", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ galleryId, fileName, contentType, variant }),
-  });
-  if (!res.ok) throw new Error((await res.json()).error || "falha ao gerar upload");
-  return res.json() as Promise<{ uploadUrl: string; key: string }>;
-}
-
-async function uploadParaR2(uploadUrl: string, blob: Blob, contentType: string) {
-  const res = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: blob,
-  });
-  if (!res.ok) throw new Error("falha no upload pro R2");
-}
-
-/** Pede ao servidor uma URL de upload resumível do Google Drive (o original
- * em alta resolução vai pra lá, não pro R2 — ver README > "Armazenamento"). */
-async function presignDrive(galleryId: string, fileName: string, contentType: string) {
-  const res = await fetch("/api/upload/drive-session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ galleryId, fileName, contentType }),
-  });
-  if (!res.ok) throw new Error((await res.json()).error || "falha ao gerar upload");
-  return res.json() as Promise<{ uploadUrl: string }>;
-}
-
-/** Envia o arquivo original direto pro Google Drive e devolve o ID do
- * arquivo criado (vem na resposta final do upload resumível). */
-async function uploadParaDrive(uploadUrl: string, file: File): Promise<string> {
-  const res = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": file.type || "application/octet-stream" },
-    body: file,
-  });
-  if (!res.ok) throw new Error("falha no upload pro Google Drive");
-  const data = await res.json();
-  return data.id as string;
-}
-
 export function Uploader({ galleryId, watermarkText, watermarkEnabled, plano }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const busy = useRef(false);
+  const queue = useRef<Item[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [enviando, setEnviando] = useState(false);
-  const [progresso, setProgresso] = useState("");
-  const [erro, setErro] = useState<string | null>(null);
+  const publish = () => setItems(queue.current.map((item) => ({ ...item })));
+  const update = (item: Item, percent: number, phase: string) => { item.percent = Math.max(item.percent, Math.min(99, percent)); item.phase = phase; publish(); };
 
-  async function handleFiles(files: FileList) {
-    setEnviando(true);
-    setErro(null);
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      setProgresso(`Enviando ${i + 1} de ${files.length}: ${file.name}`);
-      try {
-        const isVideo = file.type.startsWith("video/");
-
-        if (plano === "gratuito" && isVideo && file.size > QUINZE_MB) {
-          throw new Error("O plano gratuito permite vídeos de até 15MB. Faça upgrade pra enviar vídeos maiores.");
-        }
-
-        // 1) upload do arquivo original pro Google Drive (usado só pra
-        // download pago em alta resolução — ver README > "Armazenamento").
-        const driveSession = await presignDrive(galleryId, file.name, file.type);
-        const driveFileId = await uploadParaDrive(driveSession.uploadUrl, file);
-
-        // 2) upload da versão de preview pro bucket PÚBLICO.
-        let previewKey: string;
-        if (!isVideo) {
-          const previewBlob = await gerarPreviewFoto(file, watermarkEnabled ? watermarkText : null);
-          const preview = await presign(galleryId, `preview-${file.name}.jpg`, "image/jpeg", "preview");
-          await uploadParaR2(preview.uploadUrl, previewBlob, "image/jpeg");
-          previewKey = preview.key;
+  async function enviar(item: Item) {
+    item.status = "sending"; item.error = undefined; publish();
+    try {
+      const file = item.file;
+      const video = file.type.startsWith("video/");
+      if (!file.type.startsWith("image/") && !video) throw new Error("Selecione uma foto ou um vídeo compatível.");
+      if (!file.size) throw new Error("O arquivo está vazio.");
+      if (plano === "gratuito" && video && file.size > 15 * 1024 * 1024) throw new Error("O plano gratuito permite vídeos de até 15 MB.");
+      if (!item.previewKey) {
+        update(item, 2, video ? "Preparando vídeo" : "Preparando prévia");
+        if (!video) {
+          const photo = await preparePhoto(file, watermarkEnabled ? watermarkText : null);
+          item.width = photo.width; item.height = photo.height;
+          update(item, 5, "Enviando prévia");
+          const preview = await sendBlob(`/api/upload/preview?galleryId=${encodeURIComponent(galleryId)}`, photo.blob, { method: "POST", contentType: "image/jpeg", onProgress: (fraction) => update(item, 5 + fraction * 10, "Salvando prévia") });
+          if (typeof preview.key !== "string") throw new Error("O servidor não confirmou a prévia.");
+          item.previewKey = preview.key;
         } else {
-          // vídeo: preview = uma cópia do próprio arquivo no bucket público
-          // (sem marca d'água — ver README, limitação conhecida da v1).
-          const preview = await presign(galleryId, file.name, file.type, "preview");
-          await uploadParaR2(preview.uploadUrl, file, file.type);
-          previewKey = preview.key;
+          const preview = await jsonRequest<{ uploadUrl: string; key: string }>("/api/upload/presign", { galleryId, fileName: file.name, contentType: file.type, variant: "preview" });
+          await sendBlob(preview.uploadUrl, file, { contentType: file.type, onProgress: (fraction) => update(item, 5 + fraction * 35, "Enviando prévia do vídeo") });
+          item.previewKey = preview.key;
         }
-
-        const dims = isVideo ? {} : await lerDimensoes(file);
-
-        const res = await fetch(`/api/galerias/${galleryId}/media`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            driveFileId,
-            previewKey,
-            type: isVideo ? "video" : "photo",
-            sizeBytes: file.size,
-            ...dims,
-          }),
-        });
-        if (!res.ok) throw new Error((await res.json()).error);
-      } catch (e: any) {
-        setErro(`Erro em "${file.name}": ${e.message}`);
       }
-    }
-
-    setEnviando(false);
-    setProgresso("");
-    router.refresh();
+      if (!item.driveFileId) {
+        const resume = !!item.session;
+        update(item, video ? 40 : 15, resume ? "Conferindo envio anterior" : "Preparando original");
+        item.session ??= await jsonRequest<DriveSession>("/api/upload/drive-session", { galleryId, fileName: file.name, contentType: file.type || "application/octet-stream", sizeBytes: file.size });
+        item.driveFileId = await uploadOriginal(galleryId, item.session, file, (fraction) => update(item, (video ? 40 : 15) + fraction * (video ? 55 : 80), "Enviando original ao Drive"), resume);
+      }
+      update(item, 98, "Registrando na galeria");
+      await jsonRequest(`/api/galerias/${galleryId}/media`, { driveFileId: item.driveFileId, previewKey: item.previewKey, type: video ? "video" : "photo", sizeBytes: file.size, width: item.width, height: item.height });
+      item.percent = 100; item.status = "done"; item.phase = "Enviado";
+    } catch (error) {
+      item.status = "error"; item.error = error instanceof Error ? error.message : "Não foi possível concluir o envio.";
+    } finally { publish(); }
   }
 
+  async function run(pending: Item[]) {
+    if (busy.current) return;
+    busy.current = true; setEnviando(true);
+    let next = 0;
+    async function worker() { while (next < pending.length) await enviar(pending[next++]); }
+    try { await Promise.all(Array.from({ length: Math.min(2, pending.length) }, worker)); }
+    finally { busy.current = false; setEnviando(false); router.refresh(); }
+  }
+  function handleFiles(files: FileList) {
+    if (busy.current || !files.length) return;
+    queue.current = Array.from(files, (file, id) => ({ id, file, percent: 0, phase: "Na fila", status: "waiting" as const }));
+    publish(); void run(queue.current);
+    if (inputRef.current) inputRef.current.value = "";
+  }
+  const complete = items.filter((item) => item.status === "done").length;
+  const failed = items.filter((item) => item.status === "error");
+  const percent = items.length ? Math.floor(items.reduce((sum, item) => sum + item.percent, 0) / items.length) : 0;
   return (
-    <div>
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept="image/*,video/*"
-        className="hidden"
-        onChange={(e) => e.target.files && handleFiles(e.target.files)}
-      />
-      <button
-        disabled={enviando}
-        onClick={() => inputRef.current?.click()}
-        className="rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-paper disabled:opacity-50"
-      >
-        {enviando ? progresso || "Enviando…" : "Enviar fotos/vídeos"}
-      </button>
-      {erro && <p className="mt-2 text-sm text-red-600">{erro}</p>}
+    <div className="w-full min-w-0 max-w-2xl">
+      <input ref={inputRef} type="file" multiple accept="image/*,video/*" className="hidden" disabled={enviando} onChange={(e) => e.target.files && handleFiles(e.target.files)} />
+      <button type="button" disabled={enviando} onClick={() => inputRef.current?.click()} className="rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-paper disabled:opacity-50">{enviando ? "Enviando arquivos…" : "Enviar fotos/vídeos"}</button>
+      {!!items.length && <section aria-label="Progresso dos envios" className="mt-4 rounded-xl border border-neutral-200 bg-white p-4">
+        <div className="mb-2 flex items-center justify-between gap-3 text-sm"><p role="status">{items.length === 1 ? items[0].file.name : `${complete} de ${items.length} arquivos enviados`}</p><span className="shrink-0 font-semibold tabular-nums">{percent}%</span></div>
+        <progress className="block h-2 w-full overflow-hidden rounded-full accent-ink" aria-label="Progresso total do envio" max={100} value={percent} />
+        <ul className="mt-4 max-h-64 space-y-3 overflow-y-auto">
+          {items.map((item) => <li key={item.id} className="text-xs"><div className="mb-1 flex justify-between gap-3"><span className="min-w-0 truncate" title={item.file.name}>{item.file.name}</span><span className={`shrink-0 ${item.status === "error" ? "text-red-700" : "text-neutral-500"}`}>{item.status === "error" ? "Não concluído" : `${item.phase} · ${Math.floor(item.percent)}%`}</span></div>{items.length > 1 && <progress aria-label={`Envio de ${item.file.name}`} max={100} value={item.percent} className="block h-1 w-full accent-ink" />}{item.error && <p role="alert" className="mt-1 text-red-700">{item.error}</p>}</li>)}
+        </ul>
+        {!enviando && complete === items.length && <p role="status" className="mt-3 text-sm text-green-700">{items.length === 1 ? "Arquivo enviado e disponível na galeria." : "Todos os arquivos estão disponíveis na galeria."}</p>}
+        {!enviando && failed.length > 0 && <button type="button" onClick={() => void run(queue.current.filter((item) => item.status === "error"))} className="mt-4 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium">Tentar novamente ({failed.length})</button>}
+      </section>}
     </div>
   );
-}
-
-function lerDimensoes(file: File): Promise<{ width: number; height: number }> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve({ width: img.width, height: img.height });
-    img.onerror = () => resolve({ width: 0, height: 0 });
-    img.src = URL.createObjectURL(file);
-  });
 }

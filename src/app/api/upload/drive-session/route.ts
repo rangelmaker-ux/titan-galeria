@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { ensureGalleryFolder, createDriveUploadSession } from "@/lib/drive";
+import { signUploadSession } from "@/lib/upload-session";
 
 const bodySchema = z.object({
   galleryId: z.string().uuid(),
   fileName: z.string().min(1),
   contentType: z.string().min(1),
+  sizeBytes: z.number().int().positive().safe(),
 });
 
 /** Devolve uma URL de upload resumível do Google Drive pro arquivo ORIGINAL
@@ -23,7 +25,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "dados inválidos" }, { status: 400 });
   }
-  const { galleryId, fileName, contentType } = parsed.data;
+  const { galleryId, fileName, contentType, sizeBytes } = parsed.data;
 
   const { data: gallery } = await supabase
     .from("galleries")
@@ -40,8 +42,9 @@ export async function POST(req: NextRequest) {
       await supabase.from("galleries").update({ drive_folder_id: folderId }).eq("id", gallery.id);
     }
 
-    const uploadUrl = await createDriveUploadSession(folderId, fileName, contentType);
-    return NextResponse.json({ uploadUrl });
+    const uploadUrl = await createDriveUploadSession(folderId, fileName, contentType, sizeBytes);
+    const token = signUploadSession({ uploadUrl, userId: user.id, galleryId, sizeBytes });
+    return NextResponse.json({ uploadUrl, token });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "falha ao conectar com o Google Drive" }, { status: 502 });
   }

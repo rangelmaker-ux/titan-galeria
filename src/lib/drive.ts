@@ -69,7 +69,7 @@ export async function ensureGalleryFolder(galleryId: string, galleryTitle: strin
 /** Inicia uma sessão de upload resumível do Drive — o navegador do
  * fotógrafo envia o arquivo original direto pro Drive (sem passar pelo
  * nosso servidor), igual ao fluxo de URL assinada que já usamos com o R2. */
-export async function createDriveUploadSession(folderId: string, fileName: string, mimeType: string) {
+export async function createDriveUploadSession(folderId: string, fileName: string, mimeType: string, sizeBytes: number) {
   const token = await getAccessToken();
   const res = await fetch(`${DRIVE_UPLOAD_API}?uploadType=resumable&fields=id`, {
     method: "POST",
@@ -77,6 +77,7 @@ export async function createDriveUploadSession(folderId: string, fileName: strin
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json; charset=UTF-8",
       "X-Upload-Content-Type": mimeType || "application/octet-stream",
+      "X-Upload-Content-Length": String(sizeBytes),
     },
     body: JSON.stringify({ name: fileName, parents: [folderId] }),
   });
@@ -84,6 +85,30 @@ export async function createDriveUploadSession(folderId: string, fileName: strin
   const uploadUrl = res.headers.get("Location");
   if (!uploadUrl) throw new Error("Drive não retornou URL de upload");
   return uploadUrl;
+}
+
+/** Confere a mesma sessão quando o Drive recebe o arquivo mas o navegador
+ * perde a resposta. Não cria outro arquivo nem recebe o original no servidor. */
+export async function queryDriveUpload(uploadUrl: string, sizeBytes: number) {
+  const token = await getAccessToken();
+  const res = await fetch(uploadUrl, {
+    method: "PUT", redirect: "manual", cache: "no-store",
+    headers: { Authorization: `Bearer ${token}`, "Content-Range": `bytes */${sizeBytes}`, "Content-Length": "0" },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (res.ok) {
+    const data = await res.json();
+    if (typeof data.id !== "string" || !data.id) throw new Error("Drive sem ID do arquivo");
+    return { complete: true as const, fileId: data.id, receivedBytes: sizeBytes };
+  }
+  if (res.status === 308) {
+    const range = /^bytes=0-(\d+)$/.exec(res.headers.get("range") || "");
+    const receivedBytes = range ? Number(range[1]) + 1 : 0;
+    if (!Number.isSafeInteger(receivedBytes) || receivedBytes > sizeBytes) throw new Error("intervalo inválido");
+    return { complete: false as const, receivedBytes };
+  }
+  if (res.status === 404 || res.status === 410) return { complete: false as const, expired: true, receivedBytes: 0 };
+  throw new Error("falha ao conferir envio no Drive");
 }
 
 /** Baixa o conteúdo de um arquivo original — só chamado depois de pagamento

@@ -22,11 +22,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "não autenticado" }, { status: 401 });
 
-  const parsed = bodySchema.safeParse(await req.json());
+  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "dados inválidos" }, { status: 400 });
   }
   const { driveFileId, previewKey, type, width, height, durationS, sizeBytes } = parsed.data;
+
+  // Uma resposta perdida no navegador não deve duplicar a foto ao tentar novamente.
+  const { data: existing, error: lookupError } = await supabase.from("media")
+    .select("id").eq("gallery_id", params.id).eq("drive_file_id", driveFileId).limit(1).maybeSingle();
+  if (lookupError) return NextResponse.json({ error: "não foi possível conferir o registro anterior" }, { status: 500 });
+  if (existing) return NextResponse.json({ id: existing.id });
 
   // RLS garante que só o dono da galeria consegue inserir aqui. O trigger
   // media_limit_gratuito (migration 0006) barra o insert se o fotógrafo

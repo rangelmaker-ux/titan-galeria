@@ -14,8 +14,7 @@ export default async function PainelGaleriasPage() {
     .eq("photographer_id", user?.id)
     .order("created_at", { ascending: false });
 
-  // capa de cada álbum: a primeira foto enviada (menor "position"; empate
-  // resolvido pela mais antiga) de cada galeria, numa única query.
+  // Capa: a primeira foto enviada, independentemente de reordenações posteriores.
   const idsGalerias = (galerias ?? []).map((g) => g.id);
   const capasPorGaleria = new Map<string, string>();
   if (idsGalerias.length) {
@@ -24,8 +23,8 @@ export default async function PainelGaleriasPage() {
       .select("gallery_id, r2_key_preview, position, created_at")
       .in("gallery_id", idsGalerias)
       .eq("type", "photo")
-      .order("position", { ascending: true })
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
     for (const m of midias ?? []) {
       if (!capasPorGaleria.has(m.gallery_id) && m.r2_key_preview) {
         capasPorGaleria.set(m.gallery_id, m.r2_key_preview);
@@ -51,33 +50,36 @@ export default async function PainelGaleriasPage() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {galerias?.map((g) => {
           const capa = capasPorGaleria.get(g.id);
           return (
             <Link
               key={g.id}
               href={`/painel/galerias/${g.id}`}
-              className="group overflow-hidden rounded-xl border border-neutral-200 transition hover:border-neutral-400"
+              className="group flex min-w-0 items-center gap-4 rounded-xl border border-neutral-200 bg-white p-3 transition hover:border-neutral-400 hover:shadow-sm"
             >
-              <div className="aspect-[4/3] w-full overflow-hidden bg-neutral-100">
+              <div className="relative mt-2 h-20 w-24 shrink-0 rounded-lg rounded-tl-none border border-neutral-200 bg-neutral-100 p-1.5 before:absolute before:-top-2 before:left-[-1px] before:h-2 before:w-10 before:rounded-t-md before:border before:border-b-0 before:border-neutral-200 before:bg-neutral-100 sm:h-24 sm:w-28">
                 {capa ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={publicPreviewUrl(capa)}
                     alt=""
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                    className="h-full w-full rounded object-cover"
+                    loading="lazy"
+                    width={112}
+                    height={96}
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
-                    Sem fotos ainda
+                  <div className="flex h-full w-full items-center justify-center text-center text-xs text-neutral-400">
+                    Sem fotos
                   </div>
                 )}
               </div>
-              <div className="p-4">
-                <p className="font-medium">{g.title}</p>
+              <div className="min-w-0 py-2">
+                <p className="truncate font-medium" title={g.title}>{g.title}</p>
                 {g.client_name && (
-                  <p className="text-sm text-neutral-500">{g.client_name}</p>
+                  <p className="truncate text-sm text-neutral-500">{g.client_name}</p>
                 )}
                 <span
                   className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs ${

@@ -51,6 +51,11 @@ export async function deletePreview(key: string) {
   await r2.send(new DeleteObjectCommand({ Bucket: PUBLIC_BUCKET, Key: key }));
 }
 
+/** Somente a prévia JPEG reduzida passa pelo servidor, nunca o original. */
+export async function storePhotoPreview(key: string, body: Uint8Array) {
+  await r2.send(new PutObjectCommand({ Bucket: PUBLIC_BUCKET, Key: key, Body: body, ContentType: "image/jpeg" }));
+}
+
 /** URL pública (sem assinatura) pras previews com marca d'água / resolução
  * reduzida — essas sim podem ficar num bucket/domínio público via R2.dev
  * ou um domínio customizado configurado no Cloudflare. */

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { preparePhoto, sendBlob } from "@/lib/upload-client";
 
 type Fotografo = {
   display_name: string;
@@ -24,33 +25,31 @@ export function ProfileForm({ fotografo }: { fotografo: Fotografo }) {
   const [avatarUrl, setAvatarUrl] = useState(fotografo.avatar_url ?? "");
   const [pixKey, setPixKey] = useState(fotografo.pix_key ?? "");
   const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [progressoFoto, setProgressoFoto] = useState(0);
+  const [fotoSalva, setFotoSalva] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState(false);
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || enviandoFoto) return;
     setErro(null);
     setEnviandoFoto(true);
+    setFotoSalva(false);
+    setProgressoFoto(0);
 
     try {
-      const presignRes = await fetch("/api/upload/avatar-presign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: file.name, contentType: file.type }),
+      const photo = await preparePhoto(file, null, 512);
+      setProgressoFoto(5);
+      const data = await sendBlob("/api/upload/preview?kind=avatar", photo.blob, {
+        method: "POST", contentType: "image/jpeg", onProgress: (fraction) => setProgressoFoto(Math.floor(5 + fraction * 90)),
       });
-      if (!presignRes.ok) throw new Error((await presignRes.json()).error);
-      const { uploadUrl, publicUrl } = await presignRes.json();
-
-      const uploadRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!uploadRes.ok) throw new Error("falha ao enviar a foto");
-
-      setAvatarUrl(publicUrl);
+      if (typeof data.publicUrl !== "string") throw new Error("O servidor não confirmou a foto de perfil.");
+      setAvatarUrl(data.publicUrl);
+      setProgressoFoto(100);
+      setFotoSalva(true);
+      router.refresh();
     } catch (err: any) {
       setErro(err.message || "falha ao enviar a foto");
     } finally {
@@ -98,14 +97,18 @@ export function ProfileForm({ fotografo }: { fotografo: Fotografo }) {
             accept="image/*"
             onChange={handleAvatarChange}
             className="hidden"
+            disabled={enviandoFoto || salvando}
             id="avatar-input"
           />
-          <label
-            htmlFor="avatar-input"
-            className="cursor-pointer rounded-lg border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-100"
+          <button
+            type="button"
+            disabled={enviandoFoto || salvando}
+            onClick={() => fileInputRef.current?.click()}
+            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-100 disabled:opacity-50"
           >
             {enviandoFoto ? "Enviando…" : "Trocar foto de perfil"}
-          </label>
+          </button>
+          {(enviandoFoto || fotoSalva) && <div className="mt-3"><progress aria-label="Envio da foto de perfil" value={progressoFoto} max={100} className="block h-2 w-48 accent-ink" /><p role="status" className="mt-1 text-xs text-neutral-600">{fotoSalva ? "Foto de perfil salva · 100%" : `${progressoFoto}% · ${progressoFoto >= 95 ? "Salvando no perfil…" : "Enviando foto…"}`}</p></div>}
         </div>
       </div>
 
@@ -159,7 +162,7 @@ export function ProfileForm({ fotografo }: { fotografo: Fotografo }) {
       </label>
 
       <label className="text-sm">
-        Chave Pix (pra receber os repasses das suas vendas)
+        Chave Pix para receber diretamente dos clientes
         <input
           value={pixKey}
           onChange={(e) => setPixKey(e.target.value)}
@@ -167,16 +170,15 @@ export function ProfileForm({ fotografo }: { fotografo: Fotografo }) {
           className="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm"
         />
         <span className="mt-1 block text-xs text-neutral-500">
-          Usada pra depositarmos manualmente o que você já tem a receber. Veja em
-          &quot;Meus ganhos&quot;.
+          Você também pode configurar Pix e WhatsApp em Meus ganhos. Seus clientes pagam diretamente para você.
         </span>
       </label>
 
-      {erro && <p className="text-sm text-red-600">{erro}</p>}
+      {erro && <p role="alert" className="text-sm text-red-600">{erro}</p>}
       {sucesso && <p className="text-sm text-green-600">Salvo!</p>}
 
       <button
-        disabled={salvando}
+        disabled={salvando || enviandoFoto}
         className="mt-2 rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-paper disabled:opacity-50"
       >
         {salvando ? "Salvando…" : "Salvar"}

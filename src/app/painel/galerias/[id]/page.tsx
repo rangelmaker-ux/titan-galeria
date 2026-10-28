@@ -65,7 +65,7 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
 
       <MediaGrid galleryId={galeria.id} midias={midiasComUrl} />
 
-      <GallerySettingsForm galeria={galeria} />
+      <GallerySettingsForm galeria={galeria} previewPhotos={midiasComUrl.filter((m) => m.type === "photo").slice(0, 8).map((m) => m.previewUrl)} />
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
