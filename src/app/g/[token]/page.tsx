@@ -30,6 +30,8 @@ export default async function GaleriaPublicaPage({
     .single();
   if (!galeria) notFound();
 
+  console.log("[debug galeria]", JSON.stringify(galeria));
+
   const cookieStore = cookies();
   const desbloqueada = !galeria.password_hash || cookieStore.get(`g_${params.token}_ok`)?.value === "1";
 
