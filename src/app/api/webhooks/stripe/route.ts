@@ -68,16 +68,40 @@ export async function POST(req: NextRequest) {
           .update({ stripe_customer_id: session.customer })
           .eq("id", photographerId);
       }
-    } else {
-      // checkout avulso — cliente final comprando fotos/prints.
+    }
+  }
+
+  if (
+    event.type === "checkout.session.completed" ||
+    event.type === "checkout.session.async_payment_succeeded"
+  ) {
+    const session = event.data.object;
+    if (session.mode === "payment" && session.payment_status === "paid") {
+      // Concluir o checkout não significa que um pagamento pendente foi pago.
       const orderId = session.metadata?.orderId;
       if (orderId) {
         const supabase = createServiceClient();
-        await supabase
+        const { error } = await supabase
           .from("orders")
           .update({ status: "paid", paid_at: new Date().toISOString() })
-          .eq("id", orderId);
+          .eq("id", orderId)
+          .in("status", ["pending", "canceled"]);
+        if (error) {
+          return NextResponse.json({ error: "não foi possível confirmar o pedido" }, { status: 500 });
+        }
       }
+    }
+  }
+
+  if (event.type === "checkout.session.async_payment_failed" || event.type === "checkout.session.expired") {
+    const session = event.data.object;
+    if (session.mode === "payment" && session.metadata?.orderId) {
+      const { error } = await createServiceClient()
+        .from("orders")
+        .update({ status: "canceled" })
+        .eq("id", session.metadata.orderId)
+        .eq("status", "pending");
+      if (error) return NextResponse.json({ error: "não foi possível atualizar o pedido" }, { status: 500 });
     }
   }
 

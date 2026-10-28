@@ -193,3 +193,15 @@ src/
     stripe.ts                   # cliente Stripe
 supabase/migrations/0001_init.sql  # schema completo do banco
 ```
+
+## Checkout com Pix e gerenciamento de assinatura
+
+O checkout de produtos usa os métodos dinâmicos do Stripe. Em uma conta elegível, habilite Pix em https://dashboard.stripe.com/settings/payment_methods e mantenha os produtos em BRL. A remoção da restrição a cartão prepara a integração; não habilita o método na conta nem garante que ele apareça para qualquer transação. Consulte https://docs.stripe.com/payments/pix e https://docs.stripe.com/payments/payment-methods/dynamic-payment-methods.
+
+No endpoint de webhook existente, habilite também os eventos `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` e `checkout.session.expired`, além dos eventos de checkout e assinatura já configurados. Pedidos só são pagos quando `payment_status` é `paid`. Falha de persistência retorna HTTP 500 para permitir reenvio. Repetições não regravam a data do pagamento nem alteram pedidos já atendidos. Uma confirmação paga que chegue após um cancelamento ainda confirma o pedido.
+
+A galeria consulta a confirmação a cada três segundos por até três minutos ao retornar do checkout, independentemente do modo ao vivo. A liberação continua sendo feita pelo webhook, com validação do pagamento nas rotas de download.
+
+Para assinantes ativos, em teste, em atraso ou com cobrança pendente, o botão de troca abre o Billing Portal em vez de criar outra assinatura. Configure o portal do Stripe para permitir alterações entre os preços existentes. O plano atual e os valores devem ser conferidos no portal antes da confirmação. Os preços atuais foram preservados.
+
+Validação local de cobrança, com banco e Stripe simulados: `node --test tests/payments.test.cjs`. Isso não substitui uma compra de teste no Stripe com confirmação no Supabase e download real. Verificar antes de publicar: Pix exibido no checkout em BRL; QR Code/copia e cola; pedido pendente sem download; confirmação assinada do webhook; um único pedido pago em Meus ganhos; download original; falha/expiração sem liberação; troca da assinatura existente no portal; repasse manual inalterado.

@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const { data: fotografo } = await supabase
     .from("photographers")
-    .select("id, stripe_customer_id, display_name")
+    .select("id, stripe_customer_id, display_name, subscription_status")
     .eq("id", user.id)
     .single();
 
@@ -42,6 +42,18 @@ export async function POST(req: NextRequest) {
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+  // Trocas devem atualizar a assinatura existente, sem criar outra cobrança.
+  if (["active", "trialing", "past_due", "unpaid"].includes(fotografo.subscription_status)) {
+    if (!fotografo.stripe_customer_id) {
+      return NextResponse.json({ error: "assinatura sem vínculo de cobrança; contate o suporte" }, { status: 409 });
+    }
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: fotografo.stripe_customer_id,
+      return_url: `${siteUrl}/painel/assinatura`,
+    });
+    return NextResponse.json({ url: portal.url });
+  }
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",

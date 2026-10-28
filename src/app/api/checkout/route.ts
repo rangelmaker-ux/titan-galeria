@@ -14,7 +14,7 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   const supabase = createServiceClient();
 
-  const parsed = bodySchema.safeParse(await req.json());
+  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "dados inválidos" }, { status: 400 });
   const { shareToken, productId, mediaId, clientIdentifier, clientEmail } = parsed.data;
 
@@ -37,6 +37,11 @@ export async function POST(req: NextRequest) {
   if ((produto.type === "download_single" || produto.type === "print") && !mediaId) {
     return NextResponse.json({ error: "selecione uma foto" }, { status: 400 });
   }
+  if (mediaId && produto.type !== "download_all") {
+    const { data: media } = await supabase.from("media").select("id")
+      .eq("id", mediaId).eq("gallery_id", galeria.id).single();
+    if (!media) return NextResponse.json({ error: "foto não encontrada nesta galeria" }, { status: 400 });
+  }
 
   const { data: order, error: orderError } = await supabase
     .from("orders")
@@ -51,18 +56,22 @@ export async function POST(req: NextRequest) {
     .single();
   if (orderError) return NextResponse.json({ error: orderError.message }, { status: 400 });
 
-  await supabase.from("order_items").insert({
+  const { error: itemError } = await supabase.from("order_items").insert({
     order_id: order.id,
     product_id: produto.id,
-    media_id: mediaId ?? null,
+    media_id: produto.type === "download_all" ? null : mediaId,
     unit_price_cents: produto.price_cents,
   });
+  if (itemError) {
+    await supabase.from("orders").update({ status: "canceled" }).eq("id", order.id);
+    return NextResponse.json({ error: "não foi possível preparar o pedido" }, { status: 500 });
+  }
 
   const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL;
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
-    payment_method_types: ["card"],
+    // Métodos dinâmicos: habilite Pix no Dashboard para contas elegíveis.
     line_items: [
       {
         price_data: {

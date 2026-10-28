@@ -90,6 +90,7 @@ export function ClientGalleryView({
   const [nomeInput, setNomeInput] = useState("");
   const [favoritos, setFavoritos] = useState<Set<string>>(new Set());
   const [linksDownload, setLinksDownload] = useState<{ mediaId: string; url: string }[] | null>(null);
+  const [avisoPagamento, setAvisoPagamento] = useState<string | null>(null);
 
   useEffect(() => {
     const salvo = localStorage.getItem(`titan_galeria_id_${shareToken}`);
@@ -105,11 +106,34 @@ export function ClientGalleryView({
   }, [aoVivo, router]);
 
   useEffect(() => {
-    if (pedidoStatus === "sucesso" && orderId) {
-      fetch(`/api/downloads/${orderId}`)
-        .then((r) => r.json())
-        .then((d) => d.links && setLinksDownload(d.links));
+    if (pedidoStatus !== "sucesso" || !orderId) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    let tentativas = 0;
+    setLinksDownload(null);
+    setAvisoPagamento("Aguardando a confirmação do pagamento. Seus downloads aparecerão aqui assim que ele for confirmado.");
+    async function verificar() {
+      try {
+        const res = await fetch(`/api/downloads/${orderId}`, { cache: "no-store", signal: controller.signal });
+        const data = await res.json();
+        if (controller.signal.aborted) return;
+        if (res.ok && data.links) {
+          setLinksDownload(data.links);
+          setAvisoPagamento(null);
+          return;
+        }
+        if (res.status !== 402) {
+          setAvisoPagamento("Não foi possível consultar o pedido. Atualize a página para tentar novamente.");
+          return;
+        }
+        if (++tentativas < 60) timer = setTimeout(verificar, 3000);
+        else setAvisoPagamento("A confirmação ainda não chegou. Se já pagou, atualize esta página mais tarde para consultar novamente.");
+      } catch {
+        if (!controller.signal.aborted) setAvisoPagamento("Falha de conexão ao consultar o pagamento. Atualize a página para tentar novamente.");
+      }
     }
+    void verificar();
+    return () => { controller.abort(); clearTimeout(timer); };
   }, [pedidoStatus, orderId]);
 
   function salvarIdentificador(e: React.FormEvent) {
@@ -196,6 +220,7 @@ export function ClientGalleryView({
         )}
       </header>
 
+      {avisoPagamento && <p role="status" className="mb-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{avisoPagamento}</p>}
       {linksDownload && (
         <div className="mb-8 rounded-xl border border-green-300 bg-green-50 p-4">
           <p className="mb-2 text-sm font-medium text-green-800">

@@ -8,11 +8,11 @@ type Foto = {
 };
 
 const FOTOS: Foto[] = [
-  { src: "https://picsum.photos/seed/titan-casamento/900/1100", legenda: "Casamento" },
-  { src: "https://picsum.photos/seed/titan-15anos/900/1100", legenda: "15 anos" },
-  { src: "https://picsum.photos/seed/titan-familia/900/1100", legenda: "Família" },
-  { src: "https://picsum.photos/seed/titan-natal/900/1100", legenda: "Natal" },
-  { src: "https://picsum.photos/seed/titan-diadascriancas/900/1100", legenda: "Dia das crianças" },
+  { src: "/images/landing/casamento.jpg", legenda: "Casamento" },
+  { src: "/images/landing/15-anos.jpg", legenda: "15 anos" },
+  { src: "/images/landing/familia.jpg", legenda: "Família" },
+  { src: "/images/landing/natal.jpg", legenda: "Natal" },
+  { src: "/images/landing/dia-das-criancas.jpg", legenda: "Dia das crianças" },
 ];
 
 const ROTACOES = ["-rotate-3", "rotate-2", "-rotate-2", "rotate-3", "-rotate-1"];
@@ -43,6 +43,8 @@ export function HeroSlider() {
             <img
               src={foto.src}
               alt={foto.legenda}
+              width={900}
+              height={1100}
               className="h-72 w-64 rounded-[2px] object-cover sm:h-80 sm:w-72"
             />
             <p className="mt-3 text-center font-serif text-sm italic text-neutral-500">

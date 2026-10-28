@@ -38,7 +38,7 @@ export function BotaoAssinar({ plano, label }: { plano: PlanId; label: string })
   );
 }
 
-export function BotaoGerenciarAssinatura() {
+export function BotaoGerenciarAssinatura({ label = "Gerenciar assinatura" }: { label?: string }) {
   const [carregando, setCarregando] = useState(false);
 
   async function abrirPortal() {
@@ -64,7 +64,7 @@ export function BotaoGerenciarAssinatura() {
       disabled={carregando}
       className="rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-medium transition hover:bg-neutral-100 disabled:opacity-50"
     >
-      {carregando ? "Abrindo..." : "Gerenciar assinatura"}
+      {carregando ? "Abrindo..." : label}
     </button>
   );
 }
