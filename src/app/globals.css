@@ -9,3 +9,12 @@ html {
 body {
   @apply bg-paper text-ink antialiased;
 }
+
+@keyframes login-photo-crossfade {
+  0%, 15%, 85%, 100% { opacity: 0; }
+  35%, 65% { opacity: 1; }
+}
+.login-photo-crossfade { animation: login-photo-crossfade 18s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .login-photo-crossfade { animation: none; opacity: 0; }
+}
