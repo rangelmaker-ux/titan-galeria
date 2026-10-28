@@ -3,6 +3,11 @@ import { cookies } from "next/headers";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
+/** Fetch sem cache — evita que o Next.js guarde respostas da API do
+ * Supabase no Data Cache (ver comentário nos clientes abaixo). */
+const fetchSemCache = (url: RequestInfo | URL, options?: RequestInit) =>
+  fetch(url, { ...options, cache: "no-store" });
+
 /** Cliente Supabase pra usar em Server Components / Route Handlers,
  * autenticado como o usuário logado (respeita RLS). */
 export function createClient() {
@@ -29,9 +34,7 @@ export function createClient() {
       },
       // mesmo motivo do createServiceClient abaixo: evita que o Next.js
       // guarde respostas da API do Supabase no Data Cache.
-      global: {
-        fetch: (url, options) => fetch(url, { ...options, cache: "no-store" }),
-      },
+      global: { fetch: fetchSemCache },
     }
   );
 }
@@ -53,9 +56,7 @@ export function createServiceClient() {
       // não cada fetch individual feito por essa lib. Sem isso, dados
       // atualizados no banco (ex: remover senha de uma galeria) podiam
       // continuar "presos" em uma resposta antiga por tempo indeterminado.
-      global: {
-        fetch: (url, options) => fetch(url, { ...options, cache: "no-store" }),
-      },
+      global: { fetch: fetchSemCache },
     }
   );
 }
