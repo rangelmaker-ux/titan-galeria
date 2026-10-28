@@ -27,6 +27,11 @@ export function createClient() {
           }
         },
       },
+      // mesmo motivo do createServiceClient abaixo: evita que o Next.js
+      // guarde respostas da API do Supabase no Data Cache.
+      global: {
+        fetch: (url, options) => fetch(url, { ...options, cache: "no-store" }),
+      },
     }
   );
 }
@@ -40,6 +45,17 @@ export function createServiceClient() {
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
+    {
+      auth: { persistSession: false },
+      // O supabase-js usa o fetch global do Node, que o Next.js intercepta
+      // e guarda no Data Cache por padrão — mesmo em rotas com
+      // `dynamic = "force-dynamic"`, que só afeta a renderização da rota,
+      // não cada fetch individual feito por essa lib. Sem isso, dados
+      // atualizados no banco (ex: remover senha de uma galeria) podiam
+      // continuar "presos" em uma resposta antiga por tempo indeterminado.
+      global: {
+        fetch: (url, options) => fetch(url, { ...options, cache: "no-store" }),
+      },
+    }
   );
 }
