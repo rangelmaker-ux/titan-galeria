@@ -1,11 +1,5 @@
 import Link from "next/link";
-
-const GALERIA_DESTAQUE = [
-  "https://picsum.photos/seed/titan-galeria-1/640/800",
-  "https://picsum.photos/seed/titan-galeria-2/640/480",
-  "https://picsum.photos/seed/titan-galeria-3/640/480",
-  "https://picsum.photos/seed/titan-galeria-4/640/800",
-];
+import { HeroSlider } from "./hero-slider";
 
 const RECURSOS = [
   {
@@ -56,25 +50,7 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          {/* eslint-disable @next/next/no-img-element */}
-          <img
-            src={GALERIA_DESTAQUE[0]}
-            alt=""
-            className="col-span-1 row-span-2 h-full w-full rounded-2xl object-cover"
-          />
-          <img
-            src={GALERIA_DESTAQUE[1]}
-            alt=""
-            className="h-full w-full rounded-2xl object-cover"
-          />
-          <img
-            src={GALERIA_DESTAQUE[2]}
-            alt=""
-            className="h-full w-full rounded-2xl object-cover"
-          />
-          {/* eslint-enable @next/next/no-img-element */}
-        </div>
+        <HeroSlider />
       </div>
 
       <div className="mt-24 grid gap-8 sm:grid-cols-3">
