@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { deletePreview } from "@/lib/r2";
+import { deleteDriveFile } from "@/lib/drive";
 
 const bodySchema = z.object({
-  key: z.string().min(1),
+  driveFileId: z.string().min(1),
   previewKey: z.string().min(1),
   type: z.enum(["photo", "video"]),
   width: z.number().optional(),
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!parsed.success) {
     return NextResponse.json({ error: "dados inválidos" }, { status: 400 });
   }
-  const { key, previewKey, type, width, height, durationS } = parsed.data;
+  const { driveFileId, previewKey, type, width, height, durationS } = parsed.data;
 
   // RLS garante que só o dono da galeria consegue inserir aqui.
   const { data, error } = await supabase
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .insert({
       gallery_id: params.id,
       type,
-      r2_key_original: key,
+      drive_file_id: driveFileId,
       r2_key_preview: previewKey,
       width,
       height,
@@ -52,6 +54,14 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (!user) return NextResponse.json({ error: "não autenticado" }, { status: 401 });
 
   const { mediaId } = await req.json();
+
+  const { data: midia } = await supabase
+    .from("media")
+    .select("r2_key_preview, drive_file_id")
+    .eq("id", mediaId)
+    .eq("gallery_id", params.id)
+    .single();
+
   const { error } = await supabase
     .from("media")
     .delete()
@@ -59,5 +69,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     .eq("gallery_id", params.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // limpeza best-effort dos arquivos — não bloqueia a resposta se falhar.
+  if (midia?.r2_key_preview) deletePreview(midia.r2_key_preview).catch(() => {});
+  if (midia?.drive_file_id) deleteDriveFile(midia.drive_file_id).catch(() => {});
+
   return NextResponse.json({ ok: true });
 }

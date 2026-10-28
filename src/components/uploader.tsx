@@ -73,6 +73,31 @@ async function uploadParaR2(uploadUrl: string, blob: Blob, contentType: string) 
   if (!res.ok) throw new Error("falha no upload pro R2");
 }
 
+/** Pede ao servidor uma URL de upload resumível do Google Drive (o original
+ * em alta resolução vai pra lá, não pro R2 — ver README > "Armazenamento"). */
+async function presignDrive(galleryId: string, fileName: string, contentType: string) {
+  const res = await fetch("/api/upload/drive-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ galleryId, fileName, contentType }),
+  });
+  if (!res.ok) throw new Error((await res.json()).error || "falha ao gerar upload");
+  return res.json() as Promise<{ uploadUrl: string }>;
+}
+
+/** Envia o arquivo original direto pro Google Drive e devolve o ID do
+ * arquivo criado (vem na resposta final do upload resumível). */
+async function uploadParaDrive(uploadUrl: string, file: File): Promise<string> {
+  const res = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
+  if (!res.ok) throw new Error("falha no upload pro Google Drive");
+  const data = await res.json();
+  return data.id as string;
+}
+
 export function Uploader({ galleryId, watermarkText, watermarkEnabled }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -90,10 +115,10 @@ export function Uploader({ galleryId, watermarkText, watermarkEnabled }: Props) 
       try {
         const isVideo = file.type.startsWith("video/");
 
-        // 1) upload do arquivo original pro bucket PRIVADO (usado só pra
-        // download pago em alta resolução).
-        const original = await presign(galleryId, file.name, file.type, "original");
-        await uploadParaR2(original.uploadUrl, file, file.type);
+        // 1) upload do arquivo original pro Google Drive (usado só pra
+        // download pago em alta resolução — ver README > "Armazenamento").
+        const driveSession = await presignDrive(galleryId, file.name, file.type);
+        const driveFileId = await uploadParaDrive(driveSession.uploadUrl, file);
 
         // 2) upload da versão de preview pro bucket PÚBLICO.
         let previewKey: string;
@@ -116,7 +141,7 @@ export function Uploader({ galleryId, watermarkText, watermarkEnabled }: Props) 
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            key: original.key,
+            driveFileId,
             previewKey,
             type: isVideo ? "video" : "photo",
             ...dims,

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { createDownloadUrl } from "@/lib/r2";
 
-/** Lista as URLs de download assinadas (expiram em 5min) de um pedido já
- * pago. Chamado pela página pública da galeria depois do retorno do Stripe. */
+/** Lista os links de download de um pedido já pago. Cada link aponta pro
+ * nosso próprio proxy (/api/downloads/[orderId]/arquivo/[mediaId]), que
+ * confere o pagamento de novo e busca o arquivo original no Google Drive —
+ * o original nunca fica público nem no Drive nem em outro lugar. */
 export async function GET(_req: NextRequest, { params }: { params: { orderId: string } }) {
   const supabase = createServiceClient();
 
@@ -35,17 +36,10 @@ export async function GET(_req: NextRequest, { params }: { params: { orderId: st
     mediaIds = (items ?? []).map((i) => i.media_id).filter(Boolean) as string[];
   }
 
-  const { data: midias } = await supabase
-    .from("media")
-    .select("id, r2_key_original")
-    .in("id", mediaIds);
-
-  const links = await Promise.all(
-    (midias ?? []).map(async (m) => ({
-      mediaId: m.id,
-      url: await createDownloadUrl(m.r2_key_original),
-    }))
-  );
+  const links = mediaIds.map((mediaId) => ({
+    mediaId,
+    url: `/api/downloads/${order.id}/arquivo/${mediaId}`,
+  }));
 
   return NextResponse.json({ links });
 }
