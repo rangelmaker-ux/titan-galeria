@@ -81,7 +81,7 @@ export const PLANS: Record<PlanId, PlanDef> = {
 export const PLAN_ORDER: PlanId[] = ["gratuito", "essencial", "profissional", "estudio"];
 
 export function getPlan(id: string | null | undefined): PlanDef {
-  if (id && id in PLANS) return PLANS[id as PlanId];
+  if (id && Object.prototype.hasOwnProperty.call(PLANS, id)) return PLANS[id as PlanId];
   return PLANS.gratuito;
 }
 

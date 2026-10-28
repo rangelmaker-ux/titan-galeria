@@ -1,2 +1,11 @@
 import { redirect } from "next/navigation";
-export default function AdminPage() { redirect("/painel/ganhos"); }
+import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { ADMIN_EMAIL, isAdmin } from "@/lib/admin";
+import { getPlan } from "@/lib/plans";
+import { GrantPlan } from "./grant-plan";
+export const dynamic="force-dynamic";
+export default async function AdminPage(){
+  const db=createClient();const{data:{user}}=await db.auth.getUser();if(!isAdmin(user))redirect("/painel");
+  const{data:accounts,error}=await createServiceClient().rpc("admin_list_accounts");
+  return <div className="max-w-5xl space-y-6"><header><p className="text-xs font-medium uppercase tracking-widest text-neutral-500">Administração</p><h1 className="mt-2 text-2xl font-semibold">Contas e planos</h1><p className="mt-2 text-sm text-neutral-600">Gerencie acessos negociados fora do Stripe.</p></header><aside className="rounded-xl bg-neutral-100 p-5 text-sm leading-relaxed"><p><strong>{ADMIN_EMAIL}</strong> tem Estúdio permanente. O plano do administrador não expira nem depende de cobrança.</p><p className="mt-2">Concessões manuais ficam ativas até você removê-las. Remover uma concessão restaura o plano de cobrança registrado. Uma concessão não cancela uma assinatura Stripe existente; regularize essa cobrança separadamente se a negociação exigir.</p></aside>{error?<p role="alert" className="text-sm text-red-700">Não foi possível carregar as contas.</p>:<div className="space-y-3">{(accounts||[]).map((a:any)=><article key={a.id} className="rounded-xl border bg-white p-5"><div className="mb-4 flex flex-wrap justify-between gap-3"><div><p className="font-semibold">{a.display_name}</p><p className="mt-1 text-sm text-neutral-500">{a.email}</p></div><div className="text-right"><p className="font-semibold">{getPlan(a.plan).nome}</p><p className="mt-1 text-xs text-neutral-500">{a.plan_source==="admin"?"Administrador · sempre ativo":a.plan_source==="manual"?"Concessão manual ativa":"Plano de cobrança / gratuito"}</p></div></div>{a.email?.toLowerCase()===ADMIN_EMAIL?<p className="text-sm text-green-800">Acesso Estúdio permanente do administrador.</p>:<GrantPlan photographerId={a.id} manualPlan={a.manual_plan}/>}</article>)}</div>}<p className="text-xs text-neutral-500">Até 500 contas mais recentes.</p></div>;
+}

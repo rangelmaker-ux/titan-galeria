@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 import { PLANS, PlanId } from "@/lib/plans";
+import { isAdmin } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -18,28 +19,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "não autenticado" }, { status: 401 });
   }
 
-  const { plano } = (await req.json()) as { plano?: PlanId };
-  if (!plano || !(plano in PLANS)) {
+  if (isAdmin(user)) return NextResponse.json({ url: "/painel/assinatura" });
+  const { plano } = ((await req.json().catch(() => null)) || {}) as { plano?: PlanId };
+  if (!plano || !Object.prototype.hasOwnProperty.call(PLANS, plano)) {
     return NextResponse.json({ error: "plano inválido" }, { status: 400 });
   }
 
   const planDef = PLANS[plano];
-  if (!planDef.stripePriceId) {
-    return NextResponse.json(
-      { error: "plano não configurado no Stripe ainda" },
-      { status: 500 }
-    );
-  }
 
   const { data: fotografo } = await supabase
     .from("photographers")
-    .select("id, stripe_customer_id, display_name, subscription_status")
+    .select("id, stripe_customer_id, display_name, subscription_status, plan_source")
     .eq("id", user.id)
     .single();
 
   if (!fotografo) {
     return NextResponse.json({ error: "fotógrafo não encontrado" }, { status: 404 });
   }
+
+  if (fotografo.plan_source === "manual" || fotografo.plan_source === "admin") {
+    return NextResponse.json({ error: "Seu plano já foi liberado pela administração. Não é necessário iniciar outra assinatura." }, { status: 409 });
+  }
+  if (!planDef.stripePriceId) return NextResponse.json({ error: "plano não configurado no Stripe ainda" }, { status: 500 });
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 

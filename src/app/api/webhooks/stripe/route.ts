@@ -28,7 +28,7 @@ async function syncSubscription(subscription: any) {
       ? new Date(subscription.current_period_end * 1000).toISOString()
       : null,
   };
-  if (plano) update.plan = plano;
+  if (plano) update.billing_plan = plano;
 
   let query = supabase.from("photographers").update(update);
   query = photographerId
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
     const supabase = createServiceClient();
     await supabase
       .from("photographers")
-      .update({ subscription_status: "canceled", plan: "gratuito" })
+      .update({ subscription_status: "canceled", billing_plan: "gratuito" })
       .eq("stripe_customer_id", subscription.customer);
   }
 

@@ -221,3 +221,13 @@ Antes de publicar o código, aplicar `supabase/migrations/0007_pix_direto_produt
 `node --test tests/*.test.cjs` verifica autorização de pedidos, seleção/valores, tokens, downloads, recuperação de upload, limites do endpoint, avatar e compatibilidade Stripe. Serviços externos são simulados nesses testes. Rodar também `npx tsc --noEmit` e `npm run build`.
 
 Verificação real necessária antes da publicação: envio de arquivo → Drive/R2 → registro Supabase; pedido → Pix externo → conferência do profissional → liberação somente da seleção → download original. Conferir permissão negativa de outro fotógrafo e comprador. Os screenshots com dados fictícios não substituem esse teste.
+
+## Administração de planos
+
+`rangelmaker@gmail.com` tem Estúdio permanente por regra no banco. A concessão não depende de uma assinatura Stripe. Em `/painel/admin`, o administrador consulta contas e concede ou remove planos negociados fora da plataforma. A concessão permanece ativa até sua remoção; os registros ficam em `plan_grants_log`.
+
+`billing_plan` guarda o plano de cobrança, `manual_plan` a concessão e `plan` o acesso efetivo. O trigger mantém a precedência administrador → concessão manual → cobrança. Eventos Stripe atualizam a cobrança sem retirar acessos manuais ou do administrador. Uma concessão não cancela cobranças Stripe existentes.
+
+Aplicar também `supabase/migrations/0008_admin_planos_manuais.sql` antes do deploy. A migração protege colunas de plano contra alteração pelo navegador; edição normal de perfil, avatar, Pix e WhatsApp continua permitida. Funções privilegiadas ficam no schema privado, com wrappers executáveis somente pelo servidor. `tests/admin-plans.sql` verifica concessão/revogação, proteção do administrador, auditoria e permissões com rollback integral das fixtures.
+
+O acesso foi redesenhado em `/entrar`: painel de fotos com transição CSS, imagens locais otimizadas pelo Next Image e respeito a redução de movimento. O teste visual de login/cadastro em 1280 × 720 confirmou altura da página igual à área visível, sem rolagem nessa resolução.

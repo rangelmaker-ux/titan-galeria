@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SairButton } from "./sair-button";
+import { isAdmin } from "@/lib/admin";
 
 export default async function PainelLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -20,6 +21,7 @@ export default async function PainelLayout({ children }: { children: React.React
         <div>
           <p className="mb-8 text-sm font-semibold">Titan Galeria</p>
           <nav className="flex flex-col gap-1 text-sm">
+            {isAdmin(user) && <Link href="/painel/admin" className="rounded-md bg-neutral-100 px-3 py-2 font-medium">Administração · planos</Link>}
             <Link href="/painel" className="rounded-md px-3 py-2 hover:bg-neutral-100">
               Galerias
             </Link>

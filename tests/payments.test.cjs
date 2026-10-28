@@ -12,7 +12,7 @@ function load(relative, mocks) {
   }).outputText;
   const module = { exports: {} };
   vm.runInNewContext(output, { module, exports: module.exports, process,
-    require: (name) => name in mocks ? mocks[name] : require(name),
+    require: (name) => name in mocks ? mocks[name] : name === '@/lib/admin' ? load('src/lib/admin.ts', {}) : require(name),
   }, { filename });
   return module.exports;
 }
