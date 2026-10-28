@@ -6,6 +6,12 @@ import { PasswordGate } from "@/components/public/password-gate";
 import { ClientGalleryView } from "@/components/public/client-gallery-view";
 import { getPlan } from "@/lib/plans";
 
+// Sem isso, o fetch da galeria (via supabase-js) podia ficar em cache e a
+// página pública continuava mostrando dados antigos (senha removida, modo
+// ao vivo, etc) mesmo depois de salvos — crítico ainda mais com o modo ao
+// vivo, que depende de cada refresh trazer as fotos novas.
+export const dynamic = "force-dynamic";
+
 export default async function GaleriaPublicaPage({
   params,
   searchParams,
