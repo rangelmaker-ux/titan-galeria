@@ -28,7 +28,20 @@ type Props = {
   pedidoStatus?: string;
   orderId?: string;
   marcaTitan?: boolean;
+  template?: "grid" | "masonry" | "minimal";
 };
+
+const LAYOUT_GRID = {
+  grid: "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4",
+  masonry: "columns-2 gap-3 sm:columns-3 lg:columns-4 space-y-3",
+  minimal: "mx-auto flex max-w-2xl flex-col gap-8",
+} as const;
+
+const LAYOUT_ITEM = {
+  grid: "aspect-square",
+  masonry: "mb-3 break-inside-avoid",
+  minimal: "",
+} as const;
 
 function RodapeMarca({ marcaTitan }: { marcaTitan?: boolean }) {
   if (!marcaTitan) return null;
@@ -58,6 +71,7 @@ export function ClientGalleryView({
   pedidoStatus,
   orderId,
   marcaTitan,
+  template = "grid",
 }: Props) {
   const [identificador, setIdentificador] = useState<string | null>(null);
   const [nomeInput, setNomeInput] = useState("");
@@ -178,14 +192,25 @@ export function ClientGalleryView({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <div className={LAYOUT_GRID[template]}>
         {midias.map((m) => (
-          <div key={m.id} className="group relative aspect-square overflow-hidden rounded-lg bg-neutral-100">
+          <div
+            key={m.id}
+            className={`group relative overflow-hidden rounded-lg bg-neutral-100 ${LAYOUT_ITEM[template]}`}
+          >
             {m.type === "photo" ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={m.previewUrl} alt="" className="h-full w-full object-cover" />
+              <img
+                src={m.previewUrl}
+                alt=""
+                className={template === "grid" ? "h-full w-full object-cover" : "h-auto w-full object-cover"}
+              />
             ) : (
-              <video src={m.previewUrl} className="h-full w-full object-cover" controls />
+              <video
+                src={m.previewUrl}
+                className={template === "grid" ? "h-full w-full object-cover" : "h-auto w-full object-cover"}
+                controls
+              />
             )}
 
             {allowFavorites && (

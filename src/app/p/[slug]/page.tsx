@@ -40,7 +40,19 @@ export default async function PortfolioPublicoPage({ params }: { params: { slug:
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-16">
-      <header className="mb-12 text-center">
+      <header className="mb-14 flex flex-col items-center text-center">
+        {fotografo.avatar_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={fotografo.avatar_url}
+            alt={fotografo.display_name}
+            className="mb-5 h-24 w-24 rounded-full object-cover ring-1 ring-neutral-200"
+          />
+        ) : (
+          <div className="mb-5 flex h-24 w-24 items-center justify-center rounded-full bg-neutral-900 text-2xl font-semibold text-white">
+            {fotografo.display_name.slice(0, 1).toUpperCase()}
+          </div>
+        )}
         <h1 className="text-3xl font-semibold">{fotografo.display_name}</h1>
         {fotografo.bio && <p className="mx-auto mt-3 max-w-xl text-neutral-600">{fotografo.bio}</p>}
         <div className="mt-4 flex justify-center gap-4 text-sm text-neutral-500">
@@ -56,13 +68,13 @@ export default async function PortfolioPublicoPage({ params }: { params: { slug:
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {galerias?.map((g) => (
           <Link key={g.id} href={`/p/${params.slug}/${g.slug}`} className="group">
-            <div className="aspect-[4/3] overflow-hidden rounded-xl bg-neutral-100">
+            <div className="aspect-[4/3] overflow-hidden rounded-xl bg-neutral-100 shadow-sm transition group-hover:shadow-md">
               {capaUrl[g.id] && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={capaUrl[g.id]!}
                   alt={g.title}
-                  className="h-full w-full object-cover transition group-hover:scale-105"
+                  className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                 />
               )}
             </div>

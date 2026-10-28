@@ -44,15 +44,26 @@ export default function EntrarPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
-      <h1 className="mb-1 text-2xl font-semibold">
-        {modo === "entrar" ? "Entrar" : "Criar conta"}
-      </h1>
-      <p className="mb-6 text-sm text-neutral-500">
-        {modo === "entrar"
-          ? "Acesse o painel da sua conta."
-          : "Comece a entregar e vender suas fotos e vídeos."}
-      </p>
+    <main className="grid min-h-screen lg:grid-cols-2">
+      <div className="hidden lg:block">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="https://picsum.photos/seed/titan-galeria-login/1000/1400"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+
+      <div className="flex flex-col justify-center px-6 py-16">
+        <div className="mx-auto w-full max-w-sm">
+          <h1 className="mb-1 text-2xl font-semibold">
+            {modo === "entrar" ? "Entrar" : "Criar conta"}
+          </h1>
+          <p className="mb-6 text-sm text-neutral-500">
+            {modo === "entrar"
+              ? "Acesse o painel da sua conta."
+              : "Comece a entregar e vender suas fotos e vídeos."}
+          </p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         {modo === "cadastrar" && (
@@ -94,12 +105,14 @@ export default function EntrarPage() {
         </button>
       </form>
 
-      <button
-        onClick={() => setModo(modo === "entrar" ? "cadastrar" : "entrar")}
-        className="mt-4 text-sm text-neutral-500 underline-offset-2 hover:underline"
-      >
-        {modo === "entrar" ? "Não tem conta? Criar agora" : "Já tem conta? Entrar"}
-      </button>
+          <button
+            onClick={() => setModo(modo === "entrar" ? "cadastrar" : "entrar")}
+            className="mt-4 text-sm text-neutral-500 underline-offset-2 hover:underline"
+          >
+            {modo === "entrar" ? "Não tem conta? Criar agora" : "Já tem conta? Entrar"}
+          </button>
+        </div>
+      </div>
     </main>
   );
 }

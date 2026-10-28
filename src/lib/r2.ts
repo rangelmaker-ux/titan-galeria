@@ -63,3 +63,10 @@ export function mediaKey(galleryId: string, fileName: string, variant: "original
   const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
   return `galerias/${galleryId}/${variant}/${crypto.randomUUID()}-${safe}`;
 }
+
+/** Chave pra foto de perfil do fotógrafo — sempre no bucket público
+ * (é exibida no portfólio público /p/<slug>). */
+export function avatarKey(photographerId: string, fileName: string) {
+  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return `avatares/${photographerId}/${crypto.randomUUID()}-${safe}`;
+}

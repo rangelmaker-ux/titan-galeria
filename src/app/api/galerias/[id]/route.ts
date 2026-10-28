@@ -9,6 +9,7 @@ const bodySchema = z.object({
   allowDownloads: z.boolean().optional(),
   watermarkPreviews: z.boolean().optional(),
   password: z.string().nullable().optional(), // null/"" remove a senha
+  template: z.enum(["grid", "masonry", "minimal"]).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -20,13 +21,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "dados inválidos" }, { status: 400 });
-  const { isPublished, allowFavorites, allowDownloads, watermarkPreviews, password } = parsed.data;
+  const { isPublished, allowFavorites, allowDownloads, watermarkPreviews, password, template } =
+    parsed.data;
 
   const update: Record<string, unknown> = {};
   if (isPublished !== undefined) update.is_published = isPublished;
   if (allowFavorites !== undefined) update.allow_favorites = allowFavorites;
   if (allowDownloads !== undefined) update.allow_downloads = allowDownloads;
   if (watermarkPreviews !== undefined) update.watermark_previews = watermarkPreviews;
+  if (template !== undefined) update.template = template;
   if (password !== undefined) {
     update.password_hash = password ? await bcrypt.hash(password, 10) : null;
   }

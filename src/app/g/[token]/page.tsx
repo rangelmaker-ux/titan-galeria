@@ -18,7 +18,7 @@ export default async function GaleriaPublicaPage({
   const { data: galeria } = await supabase
     .from("galleries")
     .select(
-      "id, title, client_name, password_hash, allow_favorites, allow_downloads, photographer_id"
+      "id, title, client_name, password_hash, allow_favorites, allow_downloads, photographer_id, template"
     )
     .eq("share_token", params.token)
     .single();
@@ -67,6 +67,7 @@ export default async function GaleriaPublicaPage({
       pedidoStatus={searchParams.pedido}
       orderId={searchParams.orderId}
       marcaTitan={marcaTitan}
+      template={galeria.template}
     />
   );
 }

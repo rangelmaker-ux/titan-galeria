@@ -10,7 +10,14 @@ type Galeria = {
   allow_downloads: boolean;
   watermark_previews: boolean;
   password_hash: string | null;
+  template: "grid" | "masonry" | "minimal";
 };
+
+const TEMPLATES: { value: Galeria["template"]; label: string; descricao: string }[] = [
+  { value: "grid", label: "Grade", descricao: "Grade uniforme, clássica e organizada" },
+  { value: "masonry", label: "Mosaico", descricao: "Colunas com alturas variadas, estilo Pinterest" },
+  { value: "minimal", label: "Minimalista", descricao: "Uma foto grande por vez, sem distrações" },
+];
 
 export function GallerySettingsForm({ galeria }: { galeria: Galeria }) {
   const router = useRouter();
@@ -33,6 +40,28 @@ export function GallerySettingsForm({ galeria }: { galeria: Galeria }) {
       <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
         Configurações
       </h2>
+
+      <div className="text-sm">
+        <p className="mb-2">Modelo visual da galeria</p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {TEMPLATES.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => atualizar({ template: t.value })}
+              disabled={salvando}
+              className={`rounded-lg border px-3 py-2 text-left text-xs transition ${
+                galeria.template === t.value
+                  ? "border-ink bg-neutral-50"
+                  : "border-neutral-200 hover:bg-neutral-50"
+              }`}
+            >
+              <p className="font-medium">{t.label}</p>
+              <p className="mt-0.5 text-neutral-500">{t.descricao}</p>
+            </button>
+          ))}
+        </div>
+      </div>
 
       <Toggle
         label="Publicar no portfólio público"
