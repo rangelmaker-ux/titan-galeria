@@ -47,6 +47,8 @@ export default async function GaleriaPublicaPage({
     .from("products")
     .select("id, type, name, price_cents, currency, print_size")
     .eq("photographer_id", galeria.photographer_id)
+    .eq("gallery_id", galeria.id)
+    .is("deleted_at", null)
     .eq("active", true);
 
   const { data: fotografo } = await supabase

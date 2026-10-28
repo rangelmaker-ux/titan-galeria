@@ -14,8 +14,7 @@ próprios, em português). Feito com Next.js + Supabase + Cloudflare R2 + Stripe
   senha opcional, cliente favorita fotos (sem precisar criar conta, só
   informa o nome).
 - **Loja** — três tipos de produto (download de 1 foto, download de todas,
-  print físico em tamanho específico), checkout via Stripe, liberação do
-  link de download assinado depois do pagamento confirmado (webhook).
+  print físico em tamanho específico), vinculados a uma galeria. O cliente paga via Pix direto ao profissional, que confere e libera manualmente os arquivos do pedido.
 - **Portfólio público** — lista as galerias marcadas como "publicadas".
 - **Assinatura SaaS** — o fotógrafo assina um de três planos (Essencial,
   Profissional, Estúdio) pra usar a plataforma, via Stripe Billing
@@ -194,14 +193,31 @@ src/
 supabase/migrations/0001_init.sql  # schema completo do banco
 ```
 
-## Checkout com Pix e gerenciamento de assinatura
+## Fluxo atual: Pix direto ao profissional
 
-O checkout de produtos usa os métodos dinâmicos do Stripe. Em uma conta elegível, habilite Pix em https://dashboard.stripe.com/settings/payment_methods e mantenha os produtos em BRL. A remoção da restrição a cartão prepara a integração; não habilita o método na conta nem garante que ele apareça para qualquer transação. Consulte https://docs.stripe.com/payments/pix e https://docs.stripe.com/payments/payment-methods/dynamic-payment-methods.
+O Stripe continua responsável apenas pelas assinaturas SaaS. Os novos pedidos de fotos e impressões não criam Checkout, não passam pela conta Stripe da Titan e não geram repasses administrativos. Pedidos Stripe antigos continuam compatíveis com o webhook.
 
-No endpoint de webhook existente, habilite também os eventos `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` e `checkout.session.expired`, além dos eventos de checkout e assinatura já configurados. Pedidos só são pagos quando `payment_status` é `paid`. Falha de persistência retorna HTTP 500 para permitir reenvio. Repetições não regravam a data do pagamento nem alteram pedidos já atendidos. Uma confirmação paga que chegue após um cancelamento ainda confirma o pedido.
+1. O profissional cadastra Pix e WhatsApp em **Meus ganhos**.
+2. Em **Produtos**, vincula cada oferta a uma galeria: preço por arquivo escolhido, pacote dos arquivos já enviados ou impressão. Produtos anteriores sem vínculo ficam ocultos até a escolha da galeria.
+3. O cliente informa nome completo igual ao comprovante, escolhe os arquivos e cria um pedido. O preço vem do banco; o pedido e a seleção são gravados atomicamente pela função `create_manual_order`, acessível somente ao servidor.
+4. O cliente copia a chave Pix e envia o comprovante no WhatsApp do profissional. O link abre a conversa, sem enviar mensagem automaticamente.
+5. O profissional confere o crédito no próprio banco e confirma em **Meus ganhos** ou na galeria. Somente os arquivos do pedido são liberados; compra de impressão não concede download digital. Um pacote congela a seleção na data do pedido, sem incluir uploads futuros.
 
-A galeria consulta a confirmação a cada três segundos por até três minutos ao retornar do checkout, independentemente do modo ao vivo. A liberação continua sendo feita pelo webhook, com validação do pagamento nas rotas de download.
+Os pedidos diretos usam cookie HttpOnly específico do pedido e um token aleatório. Nome ou ID do pedido sozinhos não dão acesso. O cliente deve voltar ao mesmo navegador: não foi criado login de comprador ou sincronização entre dispositivos. Excluir produto o arquiva no catálogo, preservando os pedidos existentes.
 
-Para assinantes ativos, em teste, em atraso ou com cobrança pendente, o botão de troca abre o Billing Portal em vez de criar outra assinatura. Configure o portal do Stripe para permitir alterações entre os preços existentes. O plano atual e os valores devem ser conferidos no portal antes da confirmação. Os preços atuais foram preservados.
+Antes de publicar o código, aplicar `supabase/migrations/0007_pix_direto_produtos_galeria.sql` no projeto correto. A migração só adiciona campos/índices e função; preserva produtos, pedidos e repasses históricos. Não publicar este código antes da migração.
 
-Validação local de cobrança, com banco e Stripe simulados: `node --test tests/payments.test.cjs`. Isso não substitui uma compra de teste no Stripe com confirmação no Supabase e download real. Verificar antes de publicar: Pix exibido no checkout em BRL; QR Code/copia e cola; pedido pendente sem download; confirmação assinada do webhook; um único pedido pago em Meus ganhos; download original; falha/expiração sem liberação; troca da assinatura existente no portal; repasse manual inalterado.
+## Uploads e modelos de galeria
+
+- Fotos: prévia JPEG reduzida (lado maior até 1600 px; até 3 MB) pelo endpoint autenticado `/api/upload/preview`. O original continua indo direto ao Drive. Avatar usa o mesmo fluxo com imagem de até 512 px e já salva o perfil.
+- Vídeo: original direto ao Drive e prévia direta ao R2, sem passar arquivos grandes pelo limite de corpo da Vercel. A política CORS do bucket deve permitir o domínio real do site, PUT e Content-Type. Nunca configurar origem `*` por conveniência.
+- XHR informa bytes enviados; a interface reserva etapas para preparação e registro, sem mostrar 100% antes da confirmação. O lote usa dois envios simultâneos, contagem e progresso individual/total. Não houve medição percentual de ganho de velocidade.
+- Se a resposta do Drive se perder, o servidor consulta a mesma sessão, validada por token assinado vinculado ao usuário, galeria, tamanho e validade. A tentativa reaproveita prévia, original e sessão quando disponíveis; o registro reconhece o mesmo arquivo do Drive.
+- Grade, Mosaico e Minimalista têm miniaturas e prévia com os arquivos da galeria. A escolha é confirmada antes de salvar. Sem fotos, a tela identifica o exemplo como ilustrativo.
+- Álbuns usam pastas compactas e capa pela primeira foto enviada, sem depender da ordenação posterior.
+
+## Validação
+
+`node --test tests/*.test.cjs` verifica autorização de pedidos, seleção/valores, tokens, downloads, recuperação de upload, limites do endpoint, avatar e compatibilidade Stripe. Serviços externos são simulados nesses testes. Rodar também `npx tsc --noEmit` e `npm run build`.
+
+Verificação real necessária antes da publicação: envio de arquivo → Drive/R2 → registro Supabase; pedido → Pix externo → conferência do profissional → liberação somente da seleção → download original. Conferir permissão negativa de outro fotógrafo e comprador. Os screenshots com dados fictícios não substituem esse teste.

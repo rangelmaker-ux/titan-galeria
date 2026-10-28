@@ -1,115 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
-
+import { OrderCard, type SalesOrder } from "@/components/order-card";
+import { ReceivingForm } from "./receiving-form";
 export const dynamic = "force-dynamic";
-
-function formatarPreco(cents: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
-}
-
+const money = (cents: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 export default async function GanhosPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: fotografo } = await supabase
-    .from("photographers")
-    .select("pix_key")
-    .eq("id", user?.id)
-    .single();
-
-  // RLS (orders_owner_read / payouts_owner_read) já restringe aos pedidos e
-  // repasses do próprio fotógrafo logado.
-  const { data: pedidos } = await supabase
-    .from("orders")
-    .select("id, total_cents, status, paid_at, client_identifier, gallery_id, galleries(title)")
-    .eq("status", "paid")
-    .order("paid_at", { ascending: false });
-
-  const { data: repasses } = await supabase
-    .from("payouts")
-    .select("id, amount_cents, note, created_at")
-    .order("created_at", { ascending: false });
-
-  const totalVendido = (pedidos ?? []).reduce((soma, p) => soma + p.total_cents, 0);
-  const totalRepassado = (repasses ?? []).reduce((soma, r) => soma + r.amount_cents, 0);
-  const saldoAReceber = totalVendido - totalRepassado;
-
-  return (
-    <div className="max-w-3xl">
-      <h1 className="mb-1 text-2xl font-semibold">Meus ganhos</h1>
-      <p className="mb-6 text-sm text-neutral-500">
-        Tudo que você já vendeu nas suas galerias e quanto já foi repassado via Pix.
-      </p>
-
-      {!fotografo?.pix_key && (
-        <div className="mb-6 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Você ainda não cadastrou sua chave Pix.{" "}
-          <a href="/painel/configuracoes" className="underline">
-            Cadastre em Meu perfil
-          </a>{" "}
-          pra receber os repasses.
-        </div>
-      )}
-
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-neutral-200 p-5">
-          <p className="text-sm text-neutral-500">Total vendido</p>
-          <p className="mt-1 text-xl font-semibold">{formatarPreco(totalVendido)}</p>
-        </div>
-        <div className="rounded-2xl border border-neutral-200 p-5">
-          <p className="text-sm text-neutral-500">Já repassado</p>
-          <p className="mt-1 text-xl font-semibold">{formatarPreco(totalRepassado)}</p>
-        </div>
-        <div className="rounded-2xl border border-ink p-5">
-          <p className="text-sm text-neutral-500">Saldo a receber</p>
-          <p className="mt-1 text-xl font-semibold">{formatarPreco(saldoAReceber)}</p>
-        </div>
-      </div>
-
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-        Vendas pagas
-      </h2>
-      <div className="mb-8 flex flex-col gap-2">
-        {!pedidos?.length && (
-          <p className="text-sm text-neutral-500">Nenhuma venda paga ainda.</p>
-        )}
-        {pedidos?.map((p: any) => (
-          <div
-            key={p.id}
-            className="flex items-center justify-between rounded-lg border border-neutral-200 px-4 py-2 text-sm"
-          >
-            <span>
-              {p.galleries?.title} — {p.client_identifier}
-            </span>
-            <span className="text-neutral-500">
-              {p.paid_at && new Date(p.paid_at).toLocaleDateString("pt-BR")}
-            </span>
-            <span className="font-medium">{formatarPreco(p.total_cents)}</span>
-          </div>
-        ))}
-      </div>
-
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-        Repasses recebidos
-      </h2>
-      <div className="flex flex-col gap-2">
-        {!repasses?.length && (
-          <p className="text-sm text-neutral-500">Nenhum repasse registrado ainda.</p>
-        )}
-        {repasses?.map((r) => (
-          <div
-            key={r.id}
-            className="flex items-center justify-between rounded-lg border border-neutral-200 px-4 py-2 text-sm"
-          >
-            <span>{r.note || "Repasse via Pix"}</span>
-            <span className="text-neutral-500">
-              {new Date(r.created_at).toLocaleDateString("pt-BR")}
-            </span>
-            <span className="font-medium">{formatarPreco(r.amount_cents)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  const db = createClient(); const { data: { user } } = await db.auth.getUser();
+  const [{ data: photographer }, { data: orders, error }] = await Promise.all([
+    db.from("photographers").select("pix_key, whatsapp").eq("id", user?.id).single(),
+    db.from("orders").select("id, total_cents, status, paid_at, client_identifier, created_at, payment_method, galleries(title), order_items(media_id, product_name, product_type, media(r2_key_preview))").eq("payment_method", "manual_pix").order("created_at", { ascending: false }),
+  ]);
+  const pending = orders?.filter((o) => o.status === "pending") || [];
+  const paid = orders?.filter((o) => o.status === "paid" || o.status === "fulfilled") || [];
+  return <div className="max-w-5xl space-y-6"><header><h1 className="text-2xl font-semibold">Meus ganhos e pedidos</h1><p className="mt-2 text-sm text-neutral-600">Receba diretamente dos seus clientes e controle a liberação dos arquivos.</p></header>
+    <ReceivingForm pixKey={photographer?.pix_key} whatsapp={photographer?.whatsapp} />
+    <div className="grid gap-4 sm:grid-cols-3"><div className="rounded-xl border bg-white p-5"><p className="text-sm text-neutral-500">Pix confirmados por você</p><p className="mt-2 text-2xl font-semibold">{money(paid.reduce((sum, o) => sum + o.total_cents, 0))}</p></div><div className="rounded-xl border bg-white p-5"><p className="text-sm text-neutral-500">Aguardando sua conferência</p><p className="mt-2 text-2xl font-semibold">{pending.length} pedidos</p></div><div className="rounded-xl border bg-white p-5"><p className="text-sm text-neutral-500">Valor dos pedidos pendentes</p><p className="mt-2 text-2xl font-semibold">{money(pending.reduce((sum, o) => sum + o.total_cents, 0))}</p></div></div>
+    <aside className="rounded-xl bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">Confira o crédito na sua conta bancária e o nome do pagador antes de liberar. Receber um comprovante no WhatsApp não confirma o pagamento automaticamente. O total acima é um registro das suas confirmações, não uma consulta ao banco.</aside>
+    <section><h2 className="mb-3 text-lg font-semibold">Pedidos dos seus clientes</h2>{error ? <p role="alert">Não foi possível carregar os pedidos.</p> : !orders?.length ? <p className="text-sm text-neutral-500">Nenhum pedido direto ainda. Cadastre Pix e WhatsApp, vincule um produto à galeria e compartilhe o link.</p> : <div className="space-y-3">{orders.map((o) => <OrderCard key={o.id} order={o as unknown as SalesOrder} />)}</div>}</section></div>;
 }

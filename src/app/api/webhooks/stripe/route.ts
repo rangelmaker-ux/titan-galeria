@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
           .from("orders")
           .update({ status: "paid", paid_at: new Date().toISOString() })
           .eq("id", orderId)
+          .eq("payment_method", "stripe")
           .in("status", ["pending", "canceled"]);
         if (error) {
           return NextResponse.json({ error: "não foi possível confirmar o pedido" }, { status: 500 });
@@ -100,6 +101,7 @@ export async function POST(req: NextRequest) {
         .from("orders")
         .update({ status: "canceled" })
         .eq("id", session.metadata.orderId)
+        .eq("payment_method", "stripe")
         .eq("status", "pending");
       if (error) return NextResponse.json({ error: "não foi possível atualizar o pedido" }, { status: 500 });
     }

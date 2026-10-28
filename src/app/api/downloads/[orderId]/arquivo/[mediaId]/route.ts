@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { fetchDriveFileStream, getDriveFileMeta } from "@/lib/drive";
+import { canReadOrder } from "@/lib/order-access";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // vídeos grandes podem demorar mais pra passar pelo proxy
@@ -9,19 +10,26 @@ export const maxDuration = 60; // vídeos grandes podem demorar mais pra passar 
  * proxy do Google Drive (o original nunca é exposto publicamente — só sai
  * daqui depois de conferir de novo que o pedido está pago). */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { orderId: string; mediaId: string } }
 ) {
   const supabase = createServiceClient();
 
   const { data: order } = await supabase
     .from("orders")
-    .select("id, status, gallery_id")
+    .select("id, status, gallery_id, payment_method, access_token_hash")
     .eq("id", params.orderId)
     .single();
-  if (!order || order.status !== "paid") {
+  if (!order || !["paid", "fulfilled"].includes(order.status) || !canReadOrder(req, order)) {
     return NextResponse.json({ error: "pedido não confirmado" }, { status: 403 });
   }
+
+  const { data: items, error: itemsError } = await supabase.from("order_items").select("media_id, product_type, products(type)").eq("order_id", order.id);
+  if (itemsError) return NextResponse.json({ error: "não foi possível conferir a liberação" }, { status: 500 });
+  const allowed = (items || []).some((i: any) => order.payment_method === "manual_pix"
+    ? i.media_id === params.mediaId && i.product_type !== "print"
+    : i.products?.type === "download_all" || (i.media_id === params.mediaId && i.products?.type !== "print"));
+  if (!allowed) return NextResponse.json({ error: "arquivo não incluído neste pedido" }, { status: 403 });
 
   // confere que essa mídia pertence mesmo à galeria do pedido — evita
   // baixar mídia de outra galeria só trocando o mediaId na URL.

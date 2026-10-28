@@ -11,7 +11,7 @@ const bodySchema = z.object({
   bio: z.string().optional(),
   instagram: z.string().optional(),
   whatsapp: z.string().optional(),
-  avatarUrl: z.string().url().optional(),
+  avatarUrl: z.union([z.string().url(), z.literal("")]).optional(),
   pixKey: z.string().optional(),
 });
 
@@ -29,7 +29,7 @@ export async function PATCH(req: NextRequest) {
   const { displayName, slug, bio, instagram, whatsapp, avatarUrl, pixKey } = parsed.data;
 
   const update: Record<string, unknown> = { display_name: displayName, slug, bio, instagram, whatsapp };
-  if (avatarUrl !== undefined) update.avatar_url = avatarUrl;
+  if (avatarUrl !== undefined) update.avatar_url = avatarUrl || null;
   if (pixKey !== undefined) update.pix_key = pixKey || null;
 
   const { error } = await supabase.from("photographers").update(update).eq("id", user.id);

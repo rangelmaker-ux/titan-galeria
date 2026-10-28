@@ -5,6 +5,7 @@ import { Uploader } from "@/components/uploader";
 import { GallerySettingsForm } from "./settings-form";
 import { ShareLink } from "./share-link";
 import { MediaGrid } from "./media-grid";
+import { OrderCard, type SalesOrder } from "@/components/order-card";
 
 export default async function GaleriaPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -35,7 +36,7 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
 
   const { data: pedidos } = await supabase
     .from("orders")
-    .select("id, client_identifier, client_email, status, total_cents, created_at")
+    .select("id, client_identifier, client_email, status, total_cents, created_at, payment_method, order_items(media_id, product_name, product_type, media(r2_key_preview))")
     .eq("gallery_id", galeria.id)
     .order("created_at", { ascending: false });
 
@@ -67,6 +68,8 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
 
       <GallerySettingsForm galeria={galeria} previewPhotos={midiasComUrl.filter((m) => m.type === "photo").slice(0, 8).map((m) => m.previewUrl)} />
 
+      <section className="rounded-xl border border-neutral-200 bg-white p-5"><h2 className="font-semibold">Vender arquivos deste álbum</h2><p className="mt-2 text-sm text-neutral-600">Crie uma oferta de download por arquivo, pacote completo ou impressão vinculada a esta galeria. Seus clientes pagam no seu Pix.</p><a href={`/painel/produtos?galeria=${galeria.id}`} className="mt-3 inline-block text-sm underline">Configurar produtos e preços desta galeria →</a></section>
+
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
           Pedidos
@@ -75,28 +78,7 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
           <p className="text-sm text-neutral-500">Nenhum pedido ainda nesta galeria.</p>
         )}
         <div className="flex flex-col gap-2">
-          {pedidos?.map((p) => (
-            <div
-              key={p.id}
-              className="flex items-center justify-between rounded-lg border border-neutral-200 px-4 py-2 text-sm"
-            >
-              <span>{p.client_identifier}</span>
-              <span className="text-neutral-500">
-                R$ {(p.total_cents / 100).toFixed(2)}
-              </span>
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  p.status === "paid"
-                    ? "bg-green-100 text-green-700"
-                    : p.status === "pending"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-neutral-100 text-neutral-600"
-                }`}
-              >
-                {p.status}
-              </span>
-            </div>
-          ))}
+          {pedidos?.map((p) => <OrderCard key={p.id} order={p as unknown as SalesOrder} />)}
         </div>
       </section>
     </div>

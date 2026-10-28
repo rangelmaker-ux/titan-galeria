@@ -1,0 +1,39 @@
+const assert = require('node:assert/strict');
+const { test } = require('node:test');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const ts = require('typescript');
+function load(relative, mocks = {}) { const filename = path.join(__dirname,'..',relative); const code = ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText; const module={exports:{}}; vm.runInNewContext(code,{module,exports:module.exports,process,Buffer,URL,require:n=>n in mocks?mocks[n]:require(n)},{filename});return module.exports; }
+class Result { constructor(body, init) { this.body=body;this.status=init?.status||200;this.cookies={values:{},set:(name,value,options)=>{this.cookies.values[name]={value,options}}}; } static json(body,init){return new Result(body,init)} static redirect(url){return new Result({url},{status:307})} }
+const access=load('src/lib/order-access.ts');
+const galleryId='11111111-1111-4111-8111-111111111111';
+const mediaId='22222222-2222-4222-8222-222222222222';
+const secondId='33333333-3333-4333-8333-333333333333';
+const productId='44444444-4444-4444-8444-444444444444';
+const orderId='55555555-5555-4555-8555-555555555555';
+const token='a'.repeat(64);
+const requestBody={shareToken:'gallery-share',productId,mediaIds:[mediaId],clientIdentifier:'Ana da Silva',requestId:'66666666-6666-4666-8666-666666666666',accessToken:token};
+function req(body=requestBody,cookie){return {json:async()=>body,nextUrl:new URL('https://example.test/api/checkout'),cookies:{get:()=>cookie?{value:cookie}:undefined}}}
+function checkout(options={}) {
+ const state={calls:[],rpc:[],cookies:null};
+ const product={id:productId,name:'Arquivos digitais',type:options.type||'download_single',price_cents:2000,currency:'brl',active:true};
+ const db={from(table){const filters={};const q={select(){return q},eq(k,v){filters[k]=v;return q},is(){return q},in(k,v){filters[k]=v;return q},single:async()=>{state.calls.push({table,filters});return {data:table==='galleries'?{id:galleryId,title:'Festa',photographer_id:'seller',password_hash:options.password?'hash':null}:table==='products'?(options.noProduct?null:product):table==='photographers'?{pix_key:options.noPix?null:'pix@example.test',whatsapp:'11999999999'}:{id:orderId,total_cents:2000,pix_key_snapshot:'pix@example.test',whatsapp_snapshot:'11999999999',client_identifier:'Ana da Silva'}}},then(resolve,reject){return Promise.resolve({data:options.media||[{id:mediaId,type:'photo'}],error:null}).then(resolve,reject)}};return q},rpc:async(name,args)=>{state.rpc.push({name,args});return options.rpcError?{error:{message:'rollback'}}:{data:orderId}}};
+ const handler=load('src/app/api/checkout/route.ts',{'next/server':{NextResponse:Result},'@/lib/supabase/server':{createServiceClient:()=>db},'@/lib/order-access':access});return{state,handler};
+}
+test('manual order uses only this gallery and never creates a Stripe session',async()=>{const f=checkout();const r=await f.handler.POST(req());assert.equal(r.status,200);assert.equal(f.state.rpc.length,1);const p=f.state.calls.find(c=>c.table==='products');assert.equal(p.filters.gallery_id,galleryId);assert.equal(f.state.rpc[0].args.order_data.total_cents,2000);assert.equal(f.state.rpc[0].args.items_data.length,1);assert.equal(r.cookies.values[access.orderCookieName(orderId)].options.httpOnly,true);assert.match(r.body.whatsappUrl,/wa.me\/5511999999999/);});
+test('per-file price is multiplied by the validated selection',async()=>{const f=checkout({media:[{id:mediaId,type:'photo'},{id:secondId,type:'video'}]});await f.handler.POST(req({...requestBody,mediaIds:[mediaId,secondId]}));assert.equal(f.state.rpc[0].args.order_data.total_cents,4000)});
+test('complete-gallery product freezes exact media instead of granting future uploads',async()=>{const f=checkout({type:'download_all',media:[{id:mediaId,type:'photo'},{id:secondId,type:'photo'}]});await f.handler.POST(req({...requestBody,mediaIds:[]}));assert.equal(f.state.rpc[0].args.order_data.total_cents,2000);assert.equal(f.state.rpc[0].args.items_data.length,2);assert.equal(f.state.rpc[0].args.items_data[1].unit_price_cents,0)});
+for(const[name,opts,body,status]of[
+ ['missing full name',{}, {...requestBody,clientIdentifier:'Ana'},400],['unlinked product',{noProduct:true},requestBody,400],['missing Pix',{noPix:true},requestBody,409],['empty selection',{}, {...requestBody,mediaIds:[]},400],['foreign file',{media:[]},requestBody,400],['print from video',{type:'print',media:[{id:mediaId,type:'video'}]},requestBody,400],['locked gallery',{password:true},requestBody,403],['failed atomic persistence',{rpcError:true},requestBody,500],
+])test(`manual checkout rejects ${name}`,async()=>{const f=checkout(opts);assert.equal((await f.handler.POST(req(body))).status,status);if(!opts.rpcError)assert.equal(f.state.rpc.length,0)});
+test('buyer name cannot authorize another browser to download',()=>{const order={id:orderId,payment_method:'manual_pix',access_token_hash:access.orderTokenHash(token)};assert.equal(access.canReadOrder(req({},token),order),true);assert.equal(access.canReadOrder(req({},'wrong'),order),false);assert.equal(access.canReadOrder(req(),order),false)});
+function downloadFixture({paid=true,validCookie=true,requestedId=mediaId,type='download_single'}={}){
+ let driveReads=0;const order={id:orderId,gallery_id:galleryId,status:paid?'paid':'pending',payment_method:'manual_pix',access_token_hash:access.orderTokenHash(token)};
+ const db={from(table){const q={select(){return q},eq(){return q},single:async()=>({data:table==='orders'?order:{id:requestedId,drive_file_id:'drive-file',r2_key_original:null}}),then(resolve,reject){return Promise.resolve({data:[{media_id:mediaId,product_type:type,products:{type}}],error:null}).then(resolve,reject)}};return q}};
+ const handler=load('src/app/api/downloads/[orderId]/arquivo/[mediaId]/route.ts',{'next/server':{NextResponse:Result},'@/lib/supabase/server':{createServiceClient:()=>db},'@/lib/order-access':access,'@/lib/drive':{getDriveFileMeta:async()=>({name:'photo.jpg',mimeType:'image/jpeg'}),fetchDriveFileStream:async()=>{driveReads++;return{body:'original'}}}});
+ return{run:()=>handler.GET(req({},validCookie?token:'wrong'),{params:{orderId,mediaId:requestedId}}),reads:()=>driveReads};
+}
+for(const[name,opts,status]of[['pending order',{paid:false},403],['different browser',{validCookie:false},403],['unbought file',{requestedId:secondId},403],['physical print',{type:'print'},403],['purchased file',{},200]])test(`download enforces ${name}`,async()=>{const f=downloadFixture(opts);assert.equal((await f.run()).status,status);assert.equal(f.reads(),status===200?1:0)});
+function approval({owner=true,user=true,status='pending'}={}){let updates=0;const db={auth:{getUser:async()=>({data:{user:user?{id:'seller'}:null}})},from(table){const q={select(){return q},eq(){return q},single:async()=>({data:table==='orders'?{id:orderId,gallery_id:galleryId,status,payment_method:'manual_pix'}:owner?{id:galleryId}:null})};return q}};const service={from(){const q={update(){updates++;return q},eq(){return q},select(){return q},maybeSingle:async()=>({data:{id:orderId}})};return q}};const h=load('src/app/api/pedidos/[id]/route.ts',{'next/server':{NextResponse:Result},'@/lib/supabase/server':{createClient:()=>db,createServiceClient:()=>service}});return{run:()=>h.PATCH(req({action:'confirm'}),{params:{id:orderId}}),updates:()=>updates};}
+for(const[name,opts,status,writes]of[['owner',{},200,1],['other photographer',{owner:false},403,0],['logged-out user',{user:false},401,0],['already confirmed',{status:'paid'},200,0],['canceled order',{status:'canceled'},409,0]])test(`only legitimate approval: ${name}`,async()=>{const f=approval(opts);assert.equal((await f.run()).status,status);assert.equal(f.updates(),writes)});

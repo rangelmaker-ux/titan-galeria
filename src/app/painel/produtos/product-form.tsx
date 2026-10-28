@@ -10,7 +10,7 @@ const TIPOS: Record<Tipo, { nome: string; descricao: string; exemplo: string }> 
   print: { nome: "Foto impressa", descricao: "O cliente escolhe uma foto para impressão. Combine produção, entrega e frete diretamente com ele.", exemplo: "Foto impressa 15 × 21 cm" },
 };
 
-export function ProductForm() {
+export function ProductForm({ galleries, initialGalleryId = "" }: { galleries: { id: string; title: string }[]; initialGalleryId?: string }) {
   const router = useRouter();
   const [tipo, setTipo] = useState<Tipo>("download_single");
   const [nome, setNome] = useState("");
@@ -19,6 +19,7 @@ export function ProductForm() {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState(false);
+  const [galleryId, setGalleryId] = useState(initialGalleryId);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,7 +41,7 @@ export function ProductForm() {
       const res = await fetch("/api/produtos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: tipo, name: nome.trim(), priceCents: centavos, printSize: tipo === "print" ? tamanho.trim() || undefined : undefined }),
+        body: JSON.stringify({ galleryId, type: tipo, name: nome.trim(), priceCents: centavos, printSize: tipo === "print" ? tamanho.trim() || undefined : undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Não foi possível salvar o produto.");
@@ -54,7 +55,10 @@ export function ProductForm() {
   return (
     <form onSubmit={handleSubmit} className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
       <h2 className="text-lg font-semibold">Criar produto</h2>
-      <p className="mt-1 text-sm text-neutral-500">Defina o que você vende e quanto o cliente paga por compra.</p>
+      <p className="mt-1 text-sm text-neutral-500">Você vende os arquivos de uma galeria específica. O produto define o formato da compra e o preço.</p>
+      <label className="mt-5 block text-sm font-medium">Em qual galeria os arquivos estão?
+        <select required disabled={salvando} value={galleryId} onChange={(e) => setGalleryId(e.target.value)} className="mt-2 block w-full rounded-lg border border-neutral-300 px-3 py-2.5 font-normal"><option value="" disabled>Selecione um álbum</option>{galleries.map((g) => <option value={g.id} key={g.id}>{g.title}</option>)}</select>
+      </label>
       <fieldset disabled={salvando} className="mt-5">
         <legend className="mb-3 text-sm font-medium">1. O que você quer vender?</legend>
         <div className="grid gap-3 md:grid-cols-3">
@@ -83,7 +87,7 @@ export function ProductForm() {
         <button disabled={salvando} className="mt-5 rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-paper disabled:opacity-50">{salvando ? "Salvando…" : "Adicionar produto"}</button>
       </fieldset>
       {erro && <p role="alert" className="mt-3 text-sm text-red-700">{erro}</p>}
-      {sucesso && <p role="status" className="mt-3 text-sm text-green-700">Produto criado e disponível nas suas galerias.</p>}
+      {sucesso && <p role="status" className="mt-3 text-sm text-green-700">Produto criado e vinculado à galeria escolhida.</p>}
     </form>
   );
 }

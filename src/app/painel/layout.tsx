@@ -47,14 +47,6 @@ export default async function PainelLayout({ children }: { children: React.React
                 Ver portfólio público ↗
               </Link>
             )}
-            {user?.email === "rangelmaker@gmail.com" && (
-              <Link
-                href="/painel/admin"
-                className="mt-2 rounded-md px-3 py-2 text-amber-700 hover:bg-amber-50"
-              >
-                Admin — repasses
-              </Link>
-            )}
           </nav>
         </div>
         <div className="text-xs text-neutral-500">
