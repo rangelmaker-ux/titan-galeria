@@ -12,6 +12,7 @@ const bodySchema = z.object({
   instagram: z.string().optional(),
   whatsapp: z.string().optional(),
   avatarUrl: z.string().url().optional(),
+  pixKey: z.string().optional(),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -25,10 +26,11 @@ export async function PATCH(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
-  const { displayName, slug, bio, instagram, whatsapp, avatarUrl } = parsed.data;
+  const { displayName, slug, bio, instagram, whatsapp, avatarUrl, pixKey } = parsed.data;
 
   const update: Record<string, unknown> = { display_name: displayName, slug, bio, instagram, whatsapp };
   if (avatarUrl !== undefined) update.avatar_url = avatarUrl;
+  if (pixKey !== undefined) update.pix_key = pixKey || null;
 
   const { error } = await supabase.from("photographers").update(update).eq("id", user.id);
 

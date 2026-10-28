@@ -14,7 +14,7 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
 
   const { data: fotografo } = await supabase
     .from("photographers")
-    .select("display_name")
+    .select("display_name, plan")
     .eq("id", user?.id)
     .single();
 
@@ -58,6 +58,7 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
           galleryId={galeria.id}
           watermarkText={fotografo?.display_name ?? "Titan Galeria"}
           watermarkEnabled={galeria.watermark_previews}
+          plano={fotografo?.plan ?? "gratuito"}
         />
         <ShareLink shareToken={galeria.share_token} />
       </section>

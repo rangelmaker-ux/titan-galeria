@@ -10,6 +10,7 @@ const bodySchema = z.object({
   watermarkPreviews: z.boolean().optional(),
   password: z.string().nullable().optional(), // null/"" remove a senha
   template: z.enum(["grid", "masonry", "minimal"]).optional(),
+  realtimeMode: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -21,8 +22,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "dados inválidos" }, { status: 400 });
-  const { isPublished, allowFavorites, allowDownloads, watermarkPreviews, password, template } =
-    parsed.data;
+  const {
+    isPublished,
+    allowFavorites,
+    allowDownloads,
+    watermarkPreviews,
+    password,
+    template,
+    realtimeMode,
+  } = parsed.data;
 
   const update: Record<string, unknown> = {};
   if (isPublished !== undefined) update.is_published = isPublished;
@@ -30,6 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (allowDownloads !== undefined) update.allow_downloads = allowDownloads;
   if (watermarkPreviews !== undefined) update.watermark_previews = watermarkPreviews;
   if (template !== undefined) update.template = template;
+  if (realtimeMode !== undefined) update.realtime_mode = realtimeMode;
   if (password !== undefined) {
     update.password_hash = password ? await bcrypt.hash(password, 10) : null;
   }

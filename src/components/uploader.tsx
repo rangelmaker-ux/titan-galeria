@@ -8,7 +8,10 @@ type Props = {
   galleryId: string;
   watermarkText: string;
   watermarkEnabled: boolean;
+  plano?: string;
 };
+
+const QUINZE_MB = 15 * 1024 * 1024;
 
 /** Gera uma versão reduzida (máx. 1600px) com marca d'água em diagonal,
  * desenhada num <canvas> — evita precisar de um pipeline de imagem no
@@ -98,7 +101,7 @@ async function uploadParaDrive(uploadUrl: string, file: File): Promise<string> {
   return data.id as string;
 }
 
-export function Uploader({ galleryId, watermarkText, watermarkEnabled }: Props) {
+export function Uploader({ galleryId, watermarkText, watermarkEnabled, plano }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [enviando, setEnviando] = useState(false);
@@ -114,6 +117,10 @@ export function Uploader({ galleryId, watermarkText, watermarkEnabled }: Props) 
       setProgresso(`Enviando ${i + 1} de ${files.length}: ${file.name}`);
       try {
         const isVideo = file.type.startsWith("video/");
+
+        if (plano === "gratuito" && isVideo && file.size > QUINZE_MB) {
+          throw new Error("O plano gratuito permite vídeos de até 15MB. Faça upgrade pra enviar vídeos maiores.");
+        }
 
         // 1) upload do arquivo original pro Google Drive (usado só pra
         // download pago em alta resolução — ver README > "Armazenamento").
@@ -144,6 +151,7 @@ export function Uploader({ galleryId, watermarkText, watermarkEnabled }: Props) 
             driveFileId,
             previewKey,
             type: isVideo ? "video" : "photo",
+            sizeBytes: file.size,
             ...dims,
           }),
         });

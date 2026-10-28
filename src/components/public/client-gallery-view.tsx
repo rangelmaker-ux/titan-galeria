@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Midia = {
   id: string;
@@ -29,6 +30,7 @@ type Props = {
   orderId?: string;
   marcaTitan?: boolean;
   template?: "grid" | "masonry" | "minimal";
+  aoVivo?: boolean;
 };
 
 const LAYOUT_GRID = {
@@ -55,6 +57,15 @@ function RodapeMarca({ marcaTitan }: { marcaTitan?: boolean }) {
   );
 }
 
+function SeloAoVivo() {
+  return (
+    <span className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600">
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-600" />
+      AO VIVO
+    </span>
+  );
+}
+
 function formatarPreco(cents: number, currency: string) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: currency.toUpperCase() }).format(
     cents / 100
@@ -72,7 +83,9 @@ export function ClientGalleryView({
   orderId,
   marcaTitan,
   template = "grid",
+  aoVivo,
 }: Props) {
+  const router = useRouter();
   const [identificador, setIdentificador] = useState<string | null>(null);
   const [nomeInput, setNomeInput] = useState("");
   const [favoritos, setFavoritos] = useState<Set<string>>(new Set());
@@ -82,6 +95,14 @@ export function ClientGalleryView({
     const salvo = localStorage.getItem(`titan_galeria_id_${shareToken}`);
     if (salvo) setIdentificador(salvo);
   }, [shareToken]);
+
+  // modo ao vivo: busca fotos novas periodicamente enquanto o fotógrafo
+  // continua subindo durante o evento (estilo Banlek).
+  useEffect(() => {
+    if (!aoVivo) return;
+    const id = setInterval(() => router.refresh(), 15000);
+    return () => clearInterval(id);
+  }, [aoVivo, router]);
 
   useEffect(() => {
     if (pedidoStatus === "sucesso" && orderId) {
@@ -131,6 +152,7 @@ export function ClientGalleryView({
   if (!identificador) {
     return (
       <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
+        {aoVivo && <SeloAoVivo />}
         <h1 className="mb-1 text-xl font-semibold">{title}</h1>
         <p className="mb-6 text-sm text-neutral-500">
           Pra favoritar fotos ou fazer pedidos, diga seu nome.
@@ -160,6 +182,7 @@ export function ClientGalleryView({
     <main className="mx-auto max-w-6xl px-6 py-10">
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
+          {aoVivo && <SeloAoVivo />}
           <h1 className="text-2xl font-semibold">{title}</h1>
           {clientName && <p className="text-sm text-neutral-500">{clientName}</p>}
         </div>

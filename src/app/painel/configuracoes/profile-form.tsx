@@ -10,6 +10,7 @@ type Fotografo = {
   instagram: string | null;
   whatsapp: string | null;
   avatar_url: string | null;
+  pix_key: string | null;
 };
 
 export function ProfileForm({ fotografo }: { fotografo: Fotografo }) {
@@ -21,6 +22,7 @@ export function ProfileForm({ fotografo }: { fotografo: Fotografo }) {
   const [instagram, setInstagram] = useState(fotografo.instagram ?? "");
   const [whatsapp, setWhatsapp] = useState(fotografo.whatsapp ?? "");
   const [avatarUrl, setAvatarUrl] = useState(fotografo.avatar_url ?? "");
+  const [pixKey, setPixKey] = useState(fotografo.pix_key ?? "");
   const [enviandoFoto, setEnviandoFoto] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export function ProfileForm({ fotografo }: { fotografo: Fotografo }) {
     const res = await fetch("/api/perfil", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ displayName: nome, slug, bio, instagram, whatsapp, avatarUrl }),
+      body: JSON.stringify({ displayName: nome, slug, bio, instagram, whatsapp, avatarUrl, pixKey }),
     });
 
     if (!res.ok) {
@@ -154,6 +156,20 @@ export function ProfileForm({ fotografo }: { fotografo: Fotografo }) {
           placeholder="(xx) xxxxx-xxxx"
           className="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm"
         />
+      </label>
+
+      <label className="text-sm">
+        Chave Pix (pra receber os repasses das suas vendas)
+        <input
+          value={pixKey}
+          onChange={(e) => setPixKey(e.target.value)}
+          placeholder="CPF, e-mail, telefone ou chave aleatória"
+          className="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm"
+        />
+        <span className="mt-1 block text-xs text-neutral-500">
+          Usada pra depositarmos manualmente o que você já tem a receber. Veja em
+          &quot;Meus ganhos&quot;.
+        </span>
       </label>
 
       {erro && <p className="text-sm text-red-600">{erro}</p>}

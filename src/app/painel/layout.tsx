@@ -29,6 +29,9 @@ export default async function PainelLayout({ children }: { children: React.React
             <Link href="/painel/assinatura" className="rounded-md px-3 py-2 hover:bg-neutral-100">
               Assinatura
             </Link>
+            <Link href="/painel/ganhos" className="rounded-md px-3 py-2 hover:bg-neutral-100">
+              Meus ganhos
+            </Link>
             <Link
               href="/painel/configuracoes"
               className="rounded-md px-3 py-2 hover:bg-neutral-100"
@@ -42,6 +45,14 @@ export default async function PainelLayout({ children }: { children: React.React
                 className="rounded-md px-3 py-2 text-neutral-500 hover:bg-neutral-100"
               >
                 Ver portfólio público ↗
+              </Link>
+            )}
+            {user?.email === "rangelmaker@gmail.com" && (
+              <Link
+                href="/painel/admin"
+                className="mt-2 rounded-md px-3 py-2 text-amber-700 hover:bg-amber-50"
+              >
+                Admin — repasses
               </Link>
             )}
           </nav>

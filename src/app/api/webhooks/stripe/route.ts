@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     const supabase = createServiceClient();
     await supabase
       .from("photographers")
-      .update({ subscription_status: "canceled", plan: "essencial" })
+      .update({ subscription_status: "canceled", plan: "gratuito" })
       .eq("stripe_customer_id", subscription.customer);
   }
 

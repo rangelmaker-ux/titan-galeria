@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { deletePreview } from "@/lib/r2";
 import { deleteDriveFile } from "@/lib/drive";
+import { friendlyPlanError } from "@/lib/plans";
 
 const bodySchema = z.object({
   driveFileId: z.string().min(1),
@@ -11,6 +12,7 @@ const bodySchema = z.object({
   width: z.number().optional(),
   height: z.number().optional(),
   durationS: z.number().optional(),
+  sizeBytes: z.number().optional(),
 });
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -24,9 +26,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!parsed.success) {
     return NextResponse.json({ error: "dados inválidos" }, { status: 400 });
   }
-  const { driveFileId, previewKey, type, width, height, durationS } = parsed.data;
+  const { driveFileId, previewKey, type, width, height, durationS, sizeBytes } = parsed.data;
 
-  // RLS garante que só o dono da galeria consegue inserir aqui.
+  // RLS garante que só o dono da galeria consegue inserir aqui. O trigger
+  // media_limit_gratuito (migration 0006) barra o insert se o fotógrafo
+  // estiver no plano gratuito e já tiver batido o limite do mês.
   const { data, error } = await supabase
     .from("media")
     .insert({
@@ -37,11 +41,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       width,
       height,
       duration_s: durationS,
+      size_bytes: sizeBytes,
     })
     .select("id")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    const amigavel = friendlyPlanError(error.message);
+    return NextResponse.json({ error: amigavel || error.message }, { status: 400 });
+  }
 
   return NextResponse.json({ id: data.id });
 }

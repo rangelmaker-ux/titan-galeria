@@ -74,7 +74,7 @@ export default async function AssinaturaPage({
         {temAssinaturaAtiva ? "Trocar de plano" : "Escolha um plano"}
       </h2>
       <div className="grid gap-4 md:grid-cols-3">
-        {PLAN_ORDER.map((id) => {
+        {PLAN_ORDER.filter((id) => id !== "gratuito").map((id) => {
           const plano = PLANS[id];
           const ehAtual = fotografo?.plan === id && temAssinaturaAtiva;
           return (

@@ -11,6 +11,7 @@ type Galeria = {
   watermark_previews: boolean;
   password_hash: string | null;
   template: "grid" | "masonry" | "minimal";
+  realtime_mode: boolean;
 };
 
 const TEMPLATES: { value: Galeria["template"]; label: string; descricao: string }[] = [
@@ -67,6 +68,11 @@ export function GallerySettingsForm({ galeria }: { galeria: Galeria }) {
         label="Publicar no portfólio público"
         checked={galeria.is_published}
         onChange={(v) => atualizar({ isPublished: v })}
+      />
+      <Toggle
+        label="Modo ao vivo (evento em tempo real, tipo Banlek)"
+        checked={galeria.realtime_mode}
+        onChange={(v) => atualizar({ realtimeMode: v })}
       />
       <Toggle
         label="Cliente pode favoritar/aprovar fotos"

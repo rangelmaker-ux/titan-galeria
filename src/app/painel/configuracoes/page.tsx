@@ -9,7 +9,7 @@ export default async function ConfiguracoesPage() {
 
   const { data: fotografo } = await supabase
     .from("photographers")
-    .select("display_name, slug, bio, instagram, whatsapp, avatar_url")
+    .select("display_name, slug, bio, instagram, whatsapp, avatar_url, pix_key")
     .eq("id", user?.id)
     .single();
 

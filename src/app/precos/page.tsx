@@ -33,7 +33,7 @@ export default function PrecosPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-4">
         {PLAN_ORDER.map((id) => {
           const plano = PLANS[id];
           return (
@@ -51,7 +51,7 @@ export default function PrecosPage() {
               <h2 className="text-xl font-semibold">{plano.nome}</h2>
               <p className="mt-2">
                 <span className="text-3xl font-semibold">{plano.precoLabel}</span>
-                <span className="text-neutral-500">/mês</span>
+                {plano.precoCentavos > 0 && <span className="text-neutral-500">/mês</span>}
               </p>
               <ul className="mt-6 flex-1 space-y-2 text-sm text-neutral-700">
                 {LINHAS.map((linha) => (
@@ -69,7 +69,7 @@ export default function PrecosPage() {
                     : "border border-neutral-300 hover:bg-neutral-100"
                 }`}
               >
-                Assinar {plano.nome}
+                {plano.precoCentavos > 0 ? `Assinar ${plano.nome}` : "Criar conta grátis"}
               </Link>
             </div>
           );
