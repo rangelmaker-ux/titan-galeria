@@ -15,7 +15,7 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
 
   const { data: fotografo } = await supabase
     .from("photographers")
-    .select("display_name, plan")
+    .select("display_name, plan, watermark_logo_url, watermark_pos_x, watermark_pos_y, watermark_scale, watermark_opacity")
     .eq("id", user?.id)
     .single();
 
@@ -33,6 +33,17 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
     .select("id, type, r2_key_preview, width, height, position")
     .eq("gallery_id", galeria.id)
     .order("position", { ascending: true });
+
+  // Produtos de download já cadastrados pra esta galeria, só pra mostrar de
+  // cara se já tem preço por arquivo e/ou pacote completo configurado.
+  const { data: produtosDownload } = await supabase
+    .from("products")
+    .select("id, type, name, price_cents, active")
+    .eq("gallery_id", galeria.id)
+    .in("type", ["download_single", "download_all"])
+    .is("deleted_at", null);
+  const precoUnidade = produtosDownload?.find((p) => p.type === "download_single" && p.active);
+  const precoPacote = produtosDownload?.find((p) => p.type === "download_all" && p.active);
 
   const { data: pedidos } = await supabase
     .from("orders")
@@ -76,8 +87,13 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
       <section className="flex flex-wrap items-center gap-4">
         <Uploader
           galleryId={galeria.id}
-          watermarkText={fotografo?.display_name ?? "Titan Galeria"}
-          watermarkEnabled={galeria.watermark_previews}
+          watermark={galeria.watermark_previews ? (fotografo?.watermark_logo_url ? {
+            logoUrl: fotografo.watermark_logo_url,
+            posX: fotografo.watermark_pos_x ?? 50,
+            posY: fotografo.watermark_pos_y ?? 50,
+            scale: fotografo.watermark_scale ?? 20,
+            opacity: fotografo.watermark_opacity ?? 70,
+          } : (fotografo?.display_name ?? "Titan Galeria")) : null}
           plano={fotografo?.plan ?? "gratuito"}
         />
         <ShareLink shareToken={galeria.share_token} />
@@ -87,7 +103,27 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
 
       <GallerySettingsForm galeria={galeria} previewPhotos={midiasComUrl.filter((m) => m.type === "photo").slice(0, 8).map((m) => m.previewUrl)} />
 
-      <section className="rounded-xl border border-neutral-200 bg-white p-5"><h2 className="font-semibold">Vender arquivos deste álbum</h2><p className="mt-2 text-sm text-neutral-600">Crie uma oferta de download por arquivo, pacote completo ou impressão vinculada a esta galeria. Seus clientes pagam no seu Pix.</p><a href={`/painel/produtos?galeria=${galeria.id}`} className="mt-3 inline-block text-sm underline">Configurar produtos e preços desta galeria →</a></section>
+      <section className="rounded-xl border border-neutral-200 bg-white p-5">
+        <h2 className="font-semibold">Cobrança de downloads</h2>
+        <p className="mt-2 text-sm text-neutral-600">
+          {galeria.allow_downloads
+            ? "Esta galeria está liberada pra download gratuito (o botão \"Permitir download gratuito\" acima está ativado) — desative-o ali pra passar a cobrar."
+            : "Esta galeria não libera download de graça. Configure abaixo como você cobra por ela:"}
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-neutral-200 p-4">
+            <p className="text-sm font-medium">Por foto (unidade)</p>
+            <p className="mt-1 text-lg font-semibold">{precoUnidade ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(precoUnidade.price_cents / 100) : "Não configurado"}</p>
+            <p className="mt-1 text-xs text-neutral-500">O cliente escolhe as fotos que quer e paga por cada uma.</p>
+          </div>
+          <div className="rounded-lg border border-neutral-200 p-4">
+            <p className="text-sm font-medium">Pacote completo (ilimitado)</p>
+            <p className="mt-1 text-lg font-semibold">{precoPacote ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(precoPacote.price_cents / 100) : "Não configurado"}</p>
+            <p className="mt-1 text-xs text-neutral-500">Um valor único e o cliente baixa quantas fotos quiser do evento.</p>
+          </div>
+        </div>
+        <a href={`/painel/produtos?galeria=${galeria.id}`} className="mt-4 inline-block text-sm underline">Configurar os preços desta galeria →</a>
+      </section>
 
       {favoritosPorCliente.size > 0 && (
         <section className="rounded-xl border border-neutral-200 bg-white p-5">

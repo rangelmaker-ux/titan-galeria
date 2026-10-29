@@ -2,14 +2,14 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { jsonRequest, preparePhoto, sendBlob, uploadOriginal, type DriveSession } from "@/lib/upload-client";
+import { jsonRequest, preparePhoto, sendBlob, uploadOriginal, type DriveSession, type Watermark } from "@/lib/upload-client";
 
-type Props = { galleryId: string; watermarkText: string; watermarkEnabled: boolean; plano?: string };
+type Props = { galleryId: string; watermark: Watermark; plano?: string };
 type Item = {
   id: number; file: File; percent: number; phase: string; status: "waiting" | "sending" | "done" | "error";
   error?: string; previewKey?: string; driveFileId?: string; session?: DriveSession; width?: number; height?: number;
 };
-export function Uploader({ galleryId, watermarkText, watermarkEnabled, plano }: Props) {
+export function Uploader({ galleryId, watermark, plano }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = useRef(false);
@@ -30,7 +30,7 @@ export function Uploader({ galleryId, watermarkText, watermarkEnabled, plano }: 
       if (!item.previewKey) {
         update(item, 2, video ? "Preparando vídeo" : "Preparando prévia");
         if (!video) {
-          const photo = await preparePhoto(file, watermarkEnabled ? watermarkText : null);
+          const photo = await preparePhoto(file, watermark);
           item.width = photo.width; item.height = photo.height;
           update(item, 5, "Enviando prévia");
           const preview = await sendBlob(`/api/upload/preview?galleryId=${encodeURIComponent(galleryId)}`, photo.blob, { method: "POST", contentType: "image/jpeg", onProgress: (fraction) => update(item, 5 + fraction * 10, "Salvando prévia") });

@@ -56,6 +56,12 @@ export async function storePhotoPreview(key: string, body: Uint8Array) {
   await r2.send(new PutObjectCommand({ Bucket: PUBLIC_BUCKET, Key: key, Body: body, ContentType: "image/jpeg" }));
 }
 
+/** Versão genérica pra arquivos públicos que não são prévia JPEG (ex: a
+ * logo da marca d'água, que pode ser PNG/WebP com transparência). */
+export async function storePublicImage(key: string, body: Uint8Array, contentType: string) {
+  await r2.send(new PutObjectCommand({ Bucket: PUBLIC_BUCKET, Key: key, Body: body, ContentType: contentType }));
+}
+
 /** URL pública (sem assinatura) pras previews com marca d'água / resolução
  * reduzida — essas sim podem ficar num bucket/domínio público via R2.dev
  * ou um domínio customizado configurado no Cloudflare. */
@@ -74,4 +80,11 @@ export function mediaKey(galleryId: string, fileName: string, variant: "original
 export function avatarKey(photographerId: string, fileName: string) {
   const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
   return `avatares/${photographerId}/${crypto.randomUUID()}-${safe}`;
+}
+
+/** Chave pra logo da marca d'água do fotógrafo — sempre no bucket público
+ * (precisa ser lida de volta pelo navegador na hora de marcar as fotos). */
+export function watermarkLogoKey(photographerId: string, fileName: string) {
+  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return `marcas/${photographerId}/${crypto.randomUUID()}-${safe}`;
 }

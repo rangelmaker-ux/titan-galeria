@@ -73,10 +73,12 @@ export function GallerySettingsForm({ galeria, previewPhotos = [] }: { galeria: 
       </fieldset>
       <div className="mt-2 space-y-4 border-t border-neutral-200 pt-5">
         <Toggle label="Publicar no portfólio público" checked={settings.is_published} disabled={salvando} onChange={(v) => void atualizar({ isPublished: v })} />
-        <Toggle label="Modo ao vivo (evento em tempo real, tipo Banlek)" checked={settings.realtime_mode} disabled={salvando} onChange={(v) => void atualizar({ realtimeMode: v })} />
+        <Toggle label="Evento em tempo real (fotos aparecem ao vivo pro cliente, sem precisar recarregar a página)" checked={settings.realtime_mode} disabled={salvando} onChange={(v) => void atualizar({ realtimeMode: v })} />
         <Toggle label="Cliente pode favoritar/aprovar fotos" checked={settings.allow_favorites} disabled={salvando} onChange={(v) => void atualizar({ allowFavorites: v })} />
-        <Toggle label="Permitir download gratuito (sem cobrar)" checked={settings.allow_downloads} disabled={salvando} onChange={(v) => void atualizar({ allowDownloads: v })} />
+        <Toggle label="Permitir download gratuito (sem cobrar nada)" checked={settings.allow_downloads} disabled={salvando} onChange={(v) => void atualizar({ allowDownloads: v })} />
+        <p className="-mt-2 pl-0 text-xs text-neutral-500">Desativado = cobrado. Defina os preços (por foto ou pacote completo) na seção &quot;Cobrança de downloads&quot; abaixo.</p>
         <Toggle label="Marca d'água nas prévias" checked={settings.watermark_previews} disabled={salvando} onChange={(v) => void atualizar({ watermarkPreviews: v })} />
+        <p className="-mt-2 pl-0 text-xs text-neutral-500">Configure sua logo e a posição dela em <a href="/painel/configuracoes" className="underline">Meu perfil</a>.</p>
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="text-sm">Senha da galeria<input type="password" placeholder={settings.password_hash ? "Digite para trocar a senha" : "Sem senha"} value={senha} onChange={(e) => setSenha(e.target.value)} className="mt-1 block rounded-lg border border-neutral-300 px-3 py-2" /></label>

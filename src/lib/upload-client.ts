@@ -32,8 +32,20 @@ export function sendBlob(url: string, blob: Blob, options: {
   });
 }
 
+export type WatermarkLogo = { logoUrl: string; posX: number; posY: number; scale: number; opacity: number };
+export type Watermark = string | WatermarkLogo | null;
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Não foi possível carregar a marca d'água."));
+    img.src = src;
+  });
+}
+
 /** Uma única decodificação; limita o lado maior e libera a URL temporária. */
-export async function preparePhoto(file: File, watermark: string | null, maxSide = 1600) {
+export async function preparePhoto(file: File, watermark: Watermark, maxSide = 1600) {
   const url = URL.createObjectURL(file);
   const img = new Image();
   try {
@@ -52,7 +64,16 @@ export async function preparePhoto(file: File, watermark: string | null, maxSide
     if (!ctx) throw new Error("Seu navegador não conseguiu preparar a imagem.");
     ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    if (watermark) {
+    if (watermark && typeof watermark === "object") {
+      const logo = await loadImage(`/api/watermark-logo?u=${encodeURIComponent(watermark.logoUrl)}`);
+      const w = canvas.width * (watermark.scale / 100);
+      const h = w * ((logo.naturalHeight || logo.height || 1) / (logo.naturalWidth || logo.width || 1));
+      const x = canvas.width * (watermark.posX / 100) - w / 2;
+      const y = canvas.height * (watermark.posY / 100) - h / 2;
+      ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, watermark.opacity / 100));
+      ctx.drawImage(logo, x, y, w, h);
+      ctx.restore();
+    } else if (watermark) {
       ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = "#ffffff";
       ctx.font = `${Math.max(12, Math.round(canvas.width / 18))}px sans-serif`;
       ctx.translate(canvas.width / 2, canvas.height / 2); ctx.rotate(-Math.PI / 8); ctx.textAlign = "center";
