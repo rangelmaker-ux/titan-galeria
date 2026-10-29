@@ -1,16 +1,60 @@
-/** Definição dos planos de assinatura da Titan Galeria (o fotógrafo paga a
+/** Definição do plano de assinatura da Titan Galeria (o fotógrafo paga a
  * plataforma pra usar a ferramenta — separado do checkout que o cliente
- * final paga pelas fotos). Ver README.md > "Configurando o Stripe
+ * final paga pelas fotos). Desde que cada fotógrafo usa o próprio Google
+ * Drive (ver drive-account.ts), não existe mais limite por nível de
+ * recurso: um único plano pago ("titan") dá acesso completo, variando só
+ * o ciclo de cobrança. Ver README.md > "Configurando o Stripe
  * (assinaturas)". */
 
-export type PlanId = "gratuito" | "essencial" | "profissional" | "estudio";
+export type PlanId = "gratuito" | "titan";
+export type BillingInterval = "mensal" | "trimestral" | "anual";
+
+export interface BillingOption {
+  interval: BillingInterval;
+  label: string;
+  precoCentavos: number;
+  precoLabel: string;
+  cicloLabel: string;
+  stripePriceId: string | undefined;
+  destaque?: boolean;
+  economiaLabel?: string;
+}
+
+export const BILLING_OPTIONS: Record<BillingInterval, BillingOption> = {
+  mensal: {
+    interval: "mensal",
+    label: "Mensal",
+    precoCentavos: 3700,
+    precoLabel: "R$ 37,00",
+    cicloLabel: "por mês",
+    stripePriceId: process.env.STRIPE_PRICE_MENSAL,
+  },
+  trimestral: {
+    interval: "trimestral",
+    label: "Trimestral",
+    precoCentavos: 9700,
+    precoLabel: "R$ 97,00",
+    cicloLabel: "a cada 3 meses",
+    stripePriceId: process.env.STRIPE_PRICE_TRIMESTRAL,
+    economiaLabel: "equivale a R$ 32,33/mês",
+  },
+  anual: {
+    interval: "anual",
+    label: "Anual",
+    precoCentavos: 19700,
+    precoLabel: "R$ 197,00",
+    cicloLabel: "por ano",
+    stripePriceId: process.env.STRIPE_PRICE_ANUAL,
+    destaque: true,
+    economiaLabel: "equivale a R$ 16,42/mês",
+  },
+};
+
+export const BILLING_ORDER: BillingInterval[] = ["mensal", "trimestral", "anual"];
 
 export interface PlanDef {
   id: PlanId;
   nome: string;
-  precoCentavos: number; // em centavos de BRL, só pra exibição
-  precoLabel: string;
-  stripePriceId: string | undefined;
   galeriasLimite: number | null; // null = ilimitado
   todosTiposProduto: boolean;
   marcaPropria: boolean; // remove a marca "Titan Galeria" da galeria
@@ -18,16 +62,12 @@ export interface PlanDef {
   usuariosLabel: string;
   suporteLabel: string;
   uploadsGratisLabel?: string;
-  destaque?: boolean;
 }
 
 export const PLANS: Record<PlanId, PlanDef> = {
   gratuito: {
     id: "gratuito",
     nome: "Gratuito",
-    precoCentavos: 0,
-    precoLabel: "R$ 0",
-    stripePriceId: undefined,
     galeriasLimite: null,
     todosTiposProduto: false,
     marcaPropria: false,
@@ -36,49 +76,19 @@ export const PLANS: Record<PlanId, PlanDef> = {
     suporteLabel: "Comunidade",
     uploadsGratisLabel: "5 fotos/mês ou 1 vídeo de até 15MB/mês",
   },
-  essencial: {
-    id: "essencial",
-    nome: "Essencial",
-    precoCentavos: 2490,
-    precoLabel: "R$ 24,90",
-    stripePriceId: process.env.STRIPE_PRICE_ESSENCIAL,
-    galeriasLimite: 5,
-    todosTiposProduto: false,
-    marcaPropria: false,
-    armazenamentoLabel: "10 GB",
-    usuariosLabel: "1 (só o dono)",
-    suporteLabel: "Padrão",
-  },
-  profissional: {
-    id: "profissional",
-    nome: "Profissional",
-    precoCentavos: 6990,
-    precoLabel: "R$ 69,90",
-    stripePriceId: process.env.STRIPE_PRICE_PROFISSIONAL,
+  titan: {
+    id: "titan",
+    nome: "Titan Galeria",
     galeriasLimite: null,
     todosTiposProduto: true,
     marcaPropria: true,
-    armazenamentoLabel: "100 GB",
+    armazenamentoLabel: "Seu próprio Google Drive — sem limite nosso",
     usuariosLabel: "1 (só o dono)",
     suporteLabel: "Padrão",
-    destaque: true,
-  },
-  estudio: {
-    id: "estudio",
-    nome: "Estúdio",
-    precoCentavos: 11900,
-    precoLabel: "R$ 119,00",
-    stripePriceId: process.env.STRIPE_PRICE_ESTUDIO,
-    galeriasLimite: null,
-    todosTiposProduto: true,
-    marcaPropria: true,
-    armazenamentoLabel: "Ilimitado",
-    usuariosLabel: "Até 5 logins",
-    suporteLabel: "Prioritário",
   },
 };
 
-export const PLAN_ORDER: PlanId[] = ["gratuito", "essencial", "profissional", "estudio"];
+export const PLAN_ORDER: PlanId[] = ["gratuito", "titan"];
 
 export function getPlan(id: string | null | undefined): PlanDef {
   if (id && Object.prototype.hasOwnProperty.call(PLANS, id)) return PLANS[id as PlanId];
@@ -89,27 +99,43 @@ export function isFreePlan(id: string | null | undefined): boolean {
   return getPlan(id).id === "gratuito";
 }
 
+export function getBillingOption(interval: string | null | undefined): BillingOption | null {
+  if (interval && Object.prototype.hasOwnProperty.call(BILLING_OPTIONS, interval)) {
+    return BILLING_OPTIONS[interval as BillingInterval];
+  }
+  return null;
+}
+
+/** Qualquer Price ID das 3 cadências do Stripe indica o mesmo plano pago
+ * (titan) — usado pelo webhook pra atualizar photographers.billing_plan. */
 export function planFromStripePriceId(priceId: string | null | undefined): PlanId | null {
   if (!priceId) return null;
-  for (const id of PLAN_ORDER) {
-    if (PLANS[id].stripePriceId === priceId) return id;
+  for (const interval of BILLING_ORDER) {
+    if (BILLING_OPTIONS[interval].stripePriceId === priceId) return "titan";
+  }
+  return null;
+}
+
+/** Qual cadência (mensal/trimestral/anual) corresponde a um Price ID —
+ * usado pelo webhook pra atualizar photographers.billing_interval. */
+export function billingIntervalFromStripePriceId(priceId: string | null | undefined): BillingInterval | null {
+  if (!priceId) return null;
+  for (const interval of BILLING_ORDER) {
+    if (BILLING_OPTIONS[interval].stripePriceId === priceId) return interval;
   }
   return null;
 }
 
 /** Mensagens amigáveis pros erros levantados pelos triggers do banco
- * (supabase/migrations/0003_subscriptions.sql). */
+ * (supabase/migrations/0006_plano_gratuito_repasses.sql) — só se aplicam
+ * a quem ainda está no plano gratuito (sem assinatura ativa). */
 export const PLAN_LIMIT_MESSAGES: Record<string, string> = {
-  limite_galerias_essencial:
-    "Você atingiu o limite de 5 galerias do plano Essencial. Faça upgrade pra criar mais.",
-  limite_tipo_produto_essencial:
-    "O plano Essencial permite só um tipo de produto ativo por vez. Faça upgrade pra liberar todos.",
   limite_fotos_gratuito:
-    "Você atingiu o limite de 5 fotos por mês do plano gratuito. Faça upgrade pra enviar mais.",
+    "Você atingiu o limite de 5 fotos por mês do plano gratuito. Assine a Titan Galeria pra enviar mais.",
   limite_video_gratuito:
-    "O plano gratuito permite 1 vídeo por mês. Faça upgrade pra enviar mais.",
+    "O plano gratuito permite 1 vídeo por mês. Assine a Titan Galeria pra enviar mais.",
   limite_tamanho_video_gratuito:
-    "O plano gratuito permite vídeos de até 15MB. Faça upgrade pra enviar vídeos maiores.",
+    "O plano gratuito permite vídeos de até 15MB. Assine a Titan Galeria pra enviar vídeos maiores.",
 };
 
 export function friendlyPlanError(message: string): string | null {

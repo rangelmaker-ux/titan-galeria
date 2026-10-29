@@ -1,75 +1,69 @@
 import Link from "next/link";
-import { PLAN_ORDER, PLANS } from "@/lib/plans";
+import { BILLING_ORDER, BILLING_OPTIONS, PLANS } from "@/lib/plans";
 
-const LINHAS: { label: string; valor: (p: (typeof PLANS)["essencial"]) => string }[] = [
-  {
-    label: "Galerias ativas",
-    valor: (p) => (p.galeriasLimite ? `Até ${p.galeriasLimite}` : "Ilimitadas"),
-  },
-  {
-    label: "Loja (download/print)",
-    valor: (p) => (p.todosTiposProduto ? "Todos os tipos" : "Só 1 tipo de produto"),
-  },
-  {
-    label: 'Marca "Titan Galeria" na galeria',
-    valor: (p) => (p.marcaPropria ? "Removida (marca própria)" : "Aparece"),
-  },
-  { label: "Armazenamento", valor: (p) => p.armazenamentoLabel },
-  { label: "Usuários/equipe", valor: (p) => p.usuariosLabel },
-  { label: "Suporte", valor: (p) => p.suporteLabel },
+const plano = PLANS.titan;
+
+const RECURSOS = [
+  "Galerias ilimitadas",
+  "Todos os tipos de produto (download avulso, download de tudo, print)",
+  "Galerias com a sua marca, sem a marca Titan Galeria",
+  "Seu próprio Google Drive conectado — sem limite de armazenamento nosso",
+  "Portfólio público com curtidas",
+  "Suporte padrão",
 ];
 
 export default function PrecosPage() {
   return (
-    <main className="mx-auto max-w-6xl px-6 py-16">
+    <main className="mx-auto max-w-5xl px-6 py-16">
       <div className="mb-12 text-center">
-        <span className="text-sm uppercase tracking-widest text-neutral-500">
-          Titan Galeria
-        </span>
-        <h1 className="mt-2 text-4xl font-semibold">Planos simples, sem comissão por venda</h1>
+        <span className="text-sm uppercase tracking-widest text-neutral-500">Titan Galeria</span>
+        <h1 className="mt-2 text-4xl font-semibold">Um plano só, acesso completo</h1>
         <p className="mt-3 text-neutral-600">
-          Você paga uma mensalidade fixa pra usar a ferramenta — o que você cobra dos seus
-          clientes é todo seu.
+          Sem comissão por venda e sem níveis de recurso — você escolhe apenas a cadência de
+          cobrança. O que você cobra dos seus clientes é todo seu.
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
-        {PLAN_ORDER.map((id) => {
-          const plano = PLANS[id];
+      <div className="mb-10 rounded-2xl border border-neutral-200 bg-neutral-50 p-6 sm:p-8">
+        <h2 className="text-lg font-semibold">{plano.nome}</h2>
+        <ul className="mt-4 grid gap-2 text-sm text-neutral-700 sm:grid-cols-2">
+          {RECURSOS.map((r) => (
+            <li key={r} className="flex gap-2">
+              <span className="text-ink">✓</span>
+              <span>{r}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {BILLING_ORDER.map((interval) => {
+          const op = BILLING_OPTIONS[interval];
           return (
             <div
-              key={id}
+              key={interval}
               className={`flex flex-col rounded-2xl border p-6 ${
-                plano.destaque ? "border-ink shadow-lg" : "border-neutral-200"
+                op.destaque ? "border-ink shadow-lg" : "border-neutral-200"
               }`}
             >
-              {plano.destaque && (
+              {op.destaque && (
                 <span className="mb-3 w-fit rounded-full bg-ink px-3 py-1 text-xs font-medium text-paper">
-                  Mais popular
+                  25% de desconto
                 </span>
               )}
-              <h2 className="text-xl font-semibold">{plano.nome}</h2>
+              <h3 className="text-xl font-semibold">{op.label}</h3>
               <p className="mt-2">
-                <span className="text-3xl font-semibold">{plano.precoLabel}</span>
-                {plano.precoCentavos > 0 && <span className="text-neutral-500">/mês</span>}
+                <span className="text-3xl font-semibold">{op.precoLabel}</span>
+                <span className="text-neutral-500"> {op.cicloLabel}</span>
               </p>
-              <ul className="mt-6 flex-1 space-y-2 text-sm text-neutral-700">
-                {LINHAS.map((linha) => (
-                  <li key={linha.label} className="flex justify-between gap-4">
-                    <span className="text-neutral-500">{linha.label}</span>
-                    <span className="text-right font-medium">{linha.valor(plano)}</span>
-                  </li>
-                ))}
-              </ul>
+              {op.economiaLabel && <p className="mt-1 text-sm text-neutral-500">{op.economiaLabel}</p>}
               <Link
                 href="/entrar"
                 className={`mt-6 rounded-full px-6 py-3 text-center text-sm font-medium transition ${
-                  plano.destaque
-                    ? "bg-ink text-paper hover:opacity-90"
-                    : "border border-neutral-300 hover:bg-neutral-100"
+                  op.destaque ? "bg-ink text-paper hover:opacity-90" : "border border-neutral-300 hover:bg-neutral-100"
                 }`}
               >
-                {plano.precoCentavos > 0 ? `Assinar ${plano.nome}` : "Criar conta grátis"}
+                Assinar {op.label.toLowerCase()}
               </Link>
             </div>
           );

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { PlanId } from "@/lib/plans";
+import { BillingInterval } from "@/lib/plans";
 
-export function BotaoAssinar({ plano, label }: { plano: PlanId; label: string }) {
+export function BotaoAssinar({ intervalo, label }: { intervalo: BillingInterval; label: string }) {
   const [carregando, setCarregando] = useState(false);
 
   async function assinar() {
@@ -12,7 +12,7 @@ export function BotaoAssinar({ plano, label }: { plano: PlanId; label: string })
       const res = await fetch("/api/assinatura/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plano }),
+        body: JSON.stringify({ intervalo }),
       });
       const data = await res.json();
       if (data.url) {

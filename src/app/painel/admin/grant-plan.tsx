@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PLANS, PLAN_ORDER, type PlanId } from "@/lib/plans";
 export function GrantPlan({ photographerId, manualPlan }: { photographerId: string; manualPlan: string | null }) {
-  const router = useRouter(); const [plan, setPlan] = useState<PlanId>((manualPlan as PlanId) || "profissional"); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
+  const router = useRouter(); const [plan, setPlan] = useState<PlanId>((manualPlan as PlanId) || "titan"); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
   async function grant(value: PlanId | null) {
     if (!confirm(value ? `Liberar o plano ${PLANS[value].nome} para esta conta até você remover a concessão? Isso não cancela uma cobrança Stripe existente.` : "Remover a concessão manual? A conta voltará ao plano registrado pelo Stripe ou ao gratuito.")) return;
     setBusy(true); setError(null);

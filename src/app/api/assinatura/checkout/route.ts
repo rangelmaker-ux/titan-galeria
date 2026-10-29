@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
-import { PLANS, PlanId } from "@/lib/plans";
+import { BILLING_OPTIONS, BillingInterval } from "@/lib/plans";
 import { isAdmin } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
-/** Cria uma sessão de Checkout pra o FOTÓGRAFO assinar um plano da Titan
- * Galeria (mode "subscription" — diferente do /api/checkout, que é o
- * cliente final comprando fotos). */
+/** Cria uma sessão de Checkout pra o FOTÓGRAFO assinar a Titan Galeria
+ * (mode "subscription" — diferente do /api/checkout, que é o cliente
+ * final comprando fotos). Só existe um plano; o que varia é a cadência de
+ * cobrança (mensal/trimestral/anual). */
 export async function POST(req: NextRequest) {
   const supabase = createClient();
   const {
@@ -20,12 +21,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (isAdmin(user)) return NextResponse.json({ url: "/painel/assinatura" });
-  const { plano } = ((await req.json().catch(() => null)) || {}) as { plano?: PlanId };
-  if (!plano || !Object.prototype.hasOwnProperty.call(PLANS, plano)) {
-    return NextResponse.json({ error: "plano inválido" }, { status: 400 });
+  const { intervalo } = ((await req.json().catch(() => null)) || {}) as { intervalo?: BillingInterval };
+  if (!intervalo || !Object.prototype.hasOwnProperty.call(BILLING_OPTIONS, intervalo)) {
+    return NextResponse.json({ error: "cadência de cobrança inválida" }, { status: 400 });
   }
 
-  const planDef = PLANS[plano];
+  const planDef = BILLING_OPTIONS[intervalo];
 
   const { data: fotografo } = await supabase
     .from("photographers")
@@ -61,8 +62,8 @@ export async function POST(req: NextRequest) {
     customer: fotografo.stripe_customer_id || undefined,
     customer_email: fotografo.stripe_customer_id ? undefined : user.email,
     line_items: [{ price: planDef.stripePriceId, quantity: 1 }],
-    metadata: { photographerId: fotografo.id, plano },
-    subscription_data: { metadata: { photographerId: fotografo.id, plano } },
+    metadata: { photographerId: fotografo.id, plano: "titan", intervalo },
+    subscription_data: { metadata: { photographerId: fotografo.id, plano: "titan", intervalo } },
     success_url: `${siteUrl}/painel/assinatura?sucesso=1`,
     cancel_url: `${siteUrl}/painel/assinatura?cancelado=1`,
   });

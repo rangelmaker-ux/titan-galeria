@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createServiceClient } from "@/lib/supabase/server";
-import { planFromStripePriceId } from "@/lib/plans";
+import { planFromStripePriceId, billingIntervalFromStripePriceId } from "@/lib/plans";
 
 // Stripe exige o corpo bruto (não parseado) pra validar a assinatura.
 export const runtime = "nodejs";
@@ -18,6 +18,7 @@ async function syncSubscription(subscription: any) {
   const supabase = createServiceClient();
   const priceId = subscription.items?.data?.[0]?.price?.id as string | undefined;
   const plano = planFromStripePriceId(priceId);
+  const intervalo = billingIntervalFromStripePriceId(priceId);
   const photographerId = subscription.metadata?.photographerId as string | undefined;
 
   const update: Record<string, any> = {
@@ -29,6 +30,7 @@ async function syncSubscription(subscription: any) {
       : null,
   };
   if (plano) update.billing_plan = plano;
+  if (intervalo) update.billing_interval = intervalo;
 
   let query = supabase.from("photographers").update(update);
   query = photographerId
@@ -119,7 +121,7 @@ export async function POST(req: NextRequest) {
     const supabase = createServiceClient();
     await supabase
       .from("photographers")
-      .update({ subscription_status: "canceled", billing_plan: "gratuito" })
+      .update({ subscription_status: "canceled", billing_plan: "gratuito", billing_interval: null })
       .eq("stripe_customer_id", subscription.customer);
   }
 

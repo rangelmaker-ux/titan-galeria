@@ -99,27 +99,29 @@ público) e um público (prévias com marca d'água):
 
 Além do checkout avulso (cliente final comprando fotos/prints, seção acima),
 a Titan Galeria cobra uma **mensalidade do fotógrafo** pra usar a ferramenta
-— três planos (Essencial, Profissional, Estúdio), sem comissão por venda.
+— um único plano com acesso completo (sem níveis de recurso, já que cada
+fotógrafo usa o próprio Google Drive), variando só a cadência de cobrança:
+mensal (R$ 37), trimestral (R$ 97) ou anual (R$ 197).
 
 1. No [Catálogo de produtos](https://dashboard.stripe.com/test/products) do
-   Stripe, crie 3 produtos **recorrentes** (mensal, BRL): "Essencial",
-   "Profissional" e "Estúdio", com os valores que você quer cobrar.
+   Stripe, crie 1 produto "Titan Galeria" com **3 preços recorrentes** (BRL):
+   mensal (R$ 37), a cada 3 meses (R$ 97) e anual (R$ 197).
 2. Copie o **Price ID** de cada um (`price_...`, aparece ao abrir o produto)
-   pro `.env.local`: `STRIPE_PRICE_ESSENCIAL`, `STRIPE_PRICE_PROFISSIONAL`,
-   `STRIPE_PRICE_ESTUDIO`. Os valores exibidos em `/precos` e no painel vêm
-   de `src/lib/plans.ts` — ajuste lá se mudar o preço.
+   pro `.env.local`: `STRIPE_PRICE_MENSAL`, `STRIPE_PRICE_TRIMESTRAL`,
+   `STRIPE_PRICE_ANUAL`. Os valores exibidos em `/precos` e no painel vêm de
+   `src/lib/plans.ts` — ajuste lá se mudar o preço.
 3. No mesmo endpoint de webhook do passo anterior (**Developers > Webhooks**),
    adicione também os eventos `customer.subscription.created`,
    `customer.subscription.updated` e `customer.subscription.deleted` (além
    de `checkout.session.completed`) — usam o mesmo `STRIPE_WEBHOOK_SECRET`.
-4. Rode `supabase/migrations/0003_subscriptions.sql` no SQL Editor do
+4. Rode `supabase/migrations/0003_subscriptions.sql`, `0006_plano_gratuito_repasses.sql`,
+   `0008_admin_planos_manuais.sql` e `0010_plano_unico.sql` no SQL Editor do
    Supabase (adiciona as colunas de plano/assinatura em `photographers` e os
-   triggers que impõem os limites de cada plano no banco).
+   triggers que impõem os limites do plano gratuito no banco).
 
-> **Limitações conhecidas desta v1**: os limites de **armazenamento**
-> (10GB/100GB/ilimitado) e de **usuários/equipe** (até 5 logins no Estúdio)
-> do quadro de planos ainda não são reforçados automaticamente — só o
-> limite de galerias e de tipo de produto do plano Essencial.
+> Quem não assina continua no plano gratuito (5 fotos ou 1 vídeo de até
+> 15MB por mês) — não é mais vendido como opção, só o ponto de partida de
+> uma conta nova até ela assinar.
 
 ### 6. Configurando o Google Drive
 
