@@ -90,6 +90,7 @@ export function ClientGalleryView({
   const [nomeInput, setNomeInput] = useState("");
   const [favoritos, setFavoritos] = useState<Set<string>>(new Set());
   const [linksDownload, setLinksDownload] = useState<{ mediaId: string; url: string }[] | null>(null);
+  const [screenProtected, setScreenProtected] = useState(false);
 
   useEffect(() => {
     const salvo = localStorage.getItem(`titan_galeria_id_${shareToken}`);
@@ -103,6 +104,53 @@ export function ClientGalleryView({
     const id = setInterval(() => router.refresh(), 15000);
     return () => clearInterval(id);
   }, [aoVivo, router]);
+
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    const handleDragStart = (e: DragEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "IMG" || target.tagName === "VIDEO") {
+        e.preventDefault();
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // PrintScreen ou DevTools/Save/Print/View Source
+      if (
+        e.key === "PrintScreen" ||
+        e.key === "F12" ||
+        ((e.ctrlKey || e.metaKey) && ["s", "p", "u", "i"].includes(e.key.toLowerCase()))
+      ) {
+        setScreenProtected(true);
+        setTimeout(() => setScreenProtected(false), 3000);
+      }
+    };
+
+    const handleBlur = () => {
+      setScreenProtected(true);
+    };
+
+    const handleFocus = () => {
+      setScreenProtected(false);
+    };
+
+    window.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("dragstart", handleDragStart);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("dragstart", handleDragStart);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
 
   useEffect(() => {
     if (pedidoStatus === "sucesso" && orderId) {
@@ -215,7 +263,7 @@ export function ClientGalleryView({
         </div>
       )}
 
-      <div className={LAYOUT_GRID[template]}>
+      <div className={`${LAYOUT_GRID[template]} ${screenProtected ? "blur-xl grayscale opacity-10 transition-all duration-200" : "transition-all duration-200"}`}>
         {midias.map((m) => (
           <div
             key={m.id}
@@ -226,27 +274,36 @@ export function ClientGalleryView({
               <img
                 src={m.previewUrl}
                 alt=""
-                className={template === "grid" ? "h-full w-full object-cover" : "h-auto w-full object-cover"}
+                className={template === "grid" ? "h-full w-full object-cover select-none pointer-events-none" : "h-auto w-full object-cover select-none pointer-events-none"}
+                draggable={false}
               />
             ) : (
               <video
                 src={m.previewUrl}
                 className={template === "grid" ? "h-full w-full object-cover" : "h-auto w-full object-cover"}
                 controls
+                controlsList="nodownload noremoteplayback"
+                disablePictureInPicture
+                draggable={false}
               />
+            )}
+            
+            {/* Overlay invisível para evitar clique direito ou arrastar e soltar (mesmo com CSS e dragstart, ajuda adicional) só pra fotos (vídeo precisa dos controles nativos clicáveis) */}
+            {m.type === "photo" && (
+              <div className="absolute inset-0 z-10 bg-transparent" />
             )}
 
             {allowFavorites && (
               <button
                 onClick={() => toggleFavorito(m.id)}
-                className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-1 text-sm text-white"
+                className="absolute right-2 top-2 z-20 rounded-full bg-black/60 px-2 py-1 text-sm text-white"
               >
                 {favoritos.has(m.id) ? "♥" : "♡"}
               </button>
             )}
 
             {(produtoDownloadSingle || produtosPrint.length > 0) && (
-              <div className="absolute inset-x-0 bottom-0 hidden flex-col gap-1 bg-black/70 p-2 group-hover:flex">
+              <div className="absolute inset-x-0 bottom-0 z-20 hidden flex-col gap-1 bg-black/70 p-2 group-hover:flex">
                 {produtoDownloadSingle && (
                   <button
                     onClick={() => comprar(produtoDownloadSingle.id, m.id)}

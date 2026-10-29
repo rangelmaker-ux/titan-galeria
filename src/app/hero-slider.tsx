@@ -8,11 +8,13 @@ type Foto = {
 };
 
 const FOTOS: Foto[] = [
-  { src: "https://picsum.photos/seed/titan-casamento/900/1100", legenda: "Casamento" },
-  { src: "https://picsum.photos/seed/titan-15anos/900/1100", legenda: "15 anos" },
-  { src: "https://picsum.photos/seed/titan-familia/900/1100", legenda: "Família" },
-  { src: "https://picsum.photos/seed/titan-natal/900/1100", legenda: "Natal" },
-  { src: "https://picsum.photos/seed/titan-diadascriancas/900/1100", legenda: "Dia das crianças" },
+  { src: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=900&h=1100&auto=format&fit=crop", legenda: "Casamento" },
+  { src: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=900&h=1100&auto=format&fit=crop", legenda: "Festas & Eventos" },
+  { src: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=900&h=1100&auto=format&fit=crop", legenda: "Agro & Campo" },
+  { src: "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=900&h=1100&auto=format&fit=crop", legenda: "15 Anos" },
+  { src: "https://images.unsplash.com/photo-1555252333-9f8e92e65df9?q=80&w=900&h=1100&auto=format&fit=crop", legenda: "Parto & Maternidade" },
+  { src: "https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=900&h=1100&auto=format&fit=crop", legenda: "1 Ano de Idade" },
+  { src: "https://images.unsplash.com/photo-1556761175-5973dc0f32b7?q=80&w=900&h=1100&auto=format&fit=crop", legenda: "Institucional & Corporativo" },
 ];
 
 const ROTACOES = ["-rotate-3", "rotate-2", "-rotate-2", "rotate-3", "-rotate-1"];

@@ -107,14 +107,20 @@ export function Uploader({ galleryId, watermarkText, watermarkEnabled, plano }: 
   const [enviando, setEnviando] = useState(false);
   const [progresso, setProgresso] = useState("");
   const [erro, setErro] = useState<string | null>(null);
+  const [porcentagemTotal, setPorcentagemTotal] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
-  async function handleFiles(files: FileList) {
+  async function handleFiles(files: FileList | File[]) {
+    if (files.length === 0) return;
     setEnviando(true);
     setErro(null);
+    setPorcentagemTotal(0);
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       setProgresso(`Enviando ${i + 1} de ${files.length}: ${file.name}`);
+      setPorcentagemTotal(Math.round(((i) / files.length) * 100));
+      
       try {
         const isVideo = file.type.startsWith("video/");
 
@@ -161,13 +167,35 @@ export function Uploader({ galleryId, watermarkText, watermarkEnabled, plano }: 
       }
     }
 
-    setEnviando(false);
-    setProgresso("");
-    router.refresh();
+    setPorcentagemTotal(100);
+    setTimeout(() => {
+      setEnviando(false);
+      setProgresso("");
+      setPorcentagemTotal(0);
+      router.refresh();
+    }, 1000);
   }
 
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const onDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  };
+
   return (
-    <div>
+    <div className="w-full">
       <input
         ref={inputRef}
         type="file"
@@ -176,13 +204,39 @@ export function Uploader({ galleryId, watermarkText, watermarkEnabled, plano }: 
         className="hidden"
         onChange={(e) => e.target.files && handleFiles(e.target.files)}
       />
-      <button
-        disabled={enviando}
-        onClick={() => inputRef.current?.click()}
-        className="rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-paper disabled:opacity-50"
+      
+      <div 
+        onDragOver={onDragOver}
+        onDragEnter={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        onClick={() => !enviando && inputRef.current?.click()}
+        className={`flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition-colors ${
+          isDragging ? "border-blue-500 bg-blue-50" : "border-neutral-300 bg-neutral-50 hover:bg-neutral-100"
+        } ${enviando ? "pointer-events-none opacity-80" : ""}`}
       >
-        {enviando ? progresso || "Enviando…" : "Enviar fotos/vídeos"}
-      </button>
+        {enviando ? (
+          <div className="w-full max-w-sm text-center">
+            <p className="mb-2 text-sm font-medium text-neutral-700">{progresso}</p>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-200">
+              <div 
+                className="h-full bg-blue-600 transition-all duration-300"
+                style={{ width: `${porcentagemTotal}%` }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-neutral-500">{porcentagemTotal}% concluído</p>
+          </div>
+        ) : (
+          <div className="text-center">
+            <svg className="mx-auto mb-3 h-10 w-10 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <p className="text-sm font-medium text-neutral-700">Clique ou arraste fotos e vídeos aqui</p>
+            <p className="mt-1 text-xs text-neutral-500">Suporta JPG, PNG, MP4</p>
+          </div>
+        )}
+      </div>
+
       {erro && <p className="mt-2 text-sm text-red-600">{erro}</p>}
     </div>
   );

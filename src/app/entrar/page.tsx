@@ -45,13 +45,37 @@ export default function EntrarPage() {
 
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
-      <div className="hidden lg:block">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="https://picsum.photos/seed/titan-galeria-login/1000/1400"
-          alt=""
-          className="h-full w-full object-cover"
-        />
+      <div className="hidden flex-col items-center justify-center bg-neutral-900 px-12 py-16 lg:flex">
+        <div className="mb-12 text-center text-white">
+          <h2 className="mb-4 text-4xl font-bold">Sua galeria profissional de fotos e vídeos</h2>
+          <p className="text-lg text-neutral-400">Entregue com elegância, encante clientes e aumente suas vendas.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          <div className="transform rounded-sm bg-white p-2 pb-8 shadow-2xl transition-all duration-500 hover:scale-105 hover:rotate-0 -rotate-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=400&h=400&auto=format&fit=crop" alt="Casamento" className="h-48 w-48 object-cover rounded-[2px]" />
+            <p className="mt-2 text-center font-serif text-xs italic text-neutral-500">Casamento</p>
+          </div>
+          
+          <div className="transform rounded-sm bg-white p-2 pb-8 shadow-2xl transition-all duration-500 hover:scale-105 hover:rotate-0 rotate-2 translate-y-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=400&h=400&auto=format&fit=crop" alt="Agro" className="h-48 w-48 object-cover rounded-[2px]" />
+            <p className="mt-2 text-center font-serif text-xs italic text-neutral-500">Agro</p>
+          </div>
+
+          <div className="transform rounded-sm bg-white p-2 pb-8 shadow-2xl transition-all duration-500 hover:scale-105 hover:rotate-0 -rotate-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="https://images.unsplash.com/photo-1555252333-9f8e92e65df9?q=80&w=400&h=400&auto=format&fit=crop" alt="Parto" className="h-48 w-48 object-cover rounded-[2px]" />
+            <p className="mt-2 text-center font-serif text-xs italic text-neutral-500">Parto</p>
+          </div>
+
+          <div className="transform rounded-sm bg-white p-2 pb-8 shadow-2xl transition-all duration-500 hover:scale-105 hover:rotate-0 rotate-3 translate-y-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="https://images.unsplash.com/photo-1556761175-5973dc0f32b7?q=80&w=400&h=400&auto=format&fit=crop" alt="Institucional" className="h-48 w-48 object-cover rounded-[2px]" />
+            <p className="mt-2 text-center font-serif text-xs italic text-neutral-500">Institucional</p>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-col justify-center px-6 py-16">
