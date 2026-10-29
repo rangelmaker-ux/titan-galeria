@@ -12,9 +12,14 @@ begin;
 alter table public.photographers drop constraint if exists photographers_plan_check;
 alter table public.photographers drop constraint if exists photographers_manual_plan_check;
 
-update public.photographers set plan = 'titan' where plan in ('essencial', 'profissional', 'estudio');
-update public.photographers set billing_plan = 'titan' where billing_plan in ('essencial', 'profissional', 'estudio');
-update public.photographers set manual_plan = 'titan' where manual_plan in ('essencial', 'profissional', 'estudio');
+-- Desliga o trigger antigo enquanto convertemos os dados: a versão anterior
+-- dele prioriza manual_plan e sobrescreveria `plan` de volta pro valor
+-- antigo no meio da conversão (manual_plan só é convertido na 3ª linha).
+alter table public.photographers disable trigger enforce_titan_account_plan;
+
+update public.photographers set plan = 'titan' where plan is distinct from 'gratuito';
+update public.photographers set billing_plan = 'titan' where billing_plan is distinct from 'gratuito';
+update public.photographers set manual_plan = 'titan' where manual_plan is not null and manual_plan is distinct from 'gratuito';
 
 alter table public.photographers add constraint photographers_plan_check check (plan in ('gratuito', 'titan'));
 alter table public.photographers add constraint photographers_manual_plan_check check (manual_plan in ('gratuito', 'titan'));
@@ -55,7 +60,9 @@ begin
   insert into public.plan_grants_log (photographer_id,previous_manual_plan,new_manual_plan,granted_by) values (target_id,previous_plan,granted_plan,actor_id);
 end $$;
 
--- força o recálculo de `plan` pra quem ficou com billing_plan/manual_plan antigo
+-- Liga o trigger de volta, já com a lógica nova, e deixa ele recalcular
+-- `plan` de todo mundo de forma consistente.
+alter table public.photographers enable trigger enforce_titan_account_plan;
 update public.photographers set plan = plan;
 
 commit;
