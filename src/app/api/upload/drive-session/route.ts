@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { ensureGalleryFolder, createDriveUploadSession } from "@/lib/drive";
+import { getDriveAccount } from "@/lib/drive-account";
 import { signUploadSession } from "@/lib/upload-session";
 
 const bodySchema = z.object({
@@ -29,20 +30,23 @@ export async function POST(req: NextRequest) {
 
   const { data: gallery } = await supabase
     .from("galleries")
-    .select("id, title, drive_folder_id")
+    .select("id, title, drive_folder_id, drive_tags(drive_folder_id)")
     .eq("id", galleryId)
     .eq("photographer_id", user.id)
     .single();
   if (!gallery) return NextResponse.json({ error: "galeria não encontrada" }, { status: 404 });
 
   try {
+    const account = await getDriveAccount(user.id);
     let folderId = gallery.drive_folder_id as string | null;
     if (!folderId) {
-      folderId = await ensureGalleryFolder(gallery.id, gallery.title);
+      const tagInfo = Array.isArray(gallery.drive_tags) ? gallery.drive_tags[0] : gallery.drive_tags;
+      const tagFolderId = (tagInfo as { drive_folder_id: string } | undefined)?.drive_folder_id ?? null;
+      folderId = await ensureGalleryFolder(account, gallery.id, gallery.title, tagFolderId);
       await supabase.from("galleries").update({ drive_folder_id: folderId }).eq("id", gallery.id);
     }
 
-    const uploadUrl = await createDriveUploadSession(folderId, fileName, contentType, sizeBytes);
+    const uploadUrl = await createDriveUploadSession(account, folderId, fileName, contentType, sizeBytes);
     const token = signUploadSession({ uploadUrl, userId: user.id, galleryId, sizeBytes });
     return NextResponse.json({ uploadUrl, token });
   } catch (e: any) {

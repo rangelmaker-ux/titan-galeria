@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { fetchDriveFileStream, getDriveFileMeta } from "@/lib/drive";
+import { getDriveAccount } from "@/lib/drive-account";
 import { canReadOrder } from "@/lib/order-access";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export async function GET(
 
   const { data: order } = await supabase
     .from("orders")
-    .select("id, status, gallery_id, payment_method, access_token_hash")
+    .select("id, status, gallery_id, payment_method, access_token_hash, galleries(photographer_id)")
     .eq("id", params.orderId)
     .single();
   if (!order || !["paid", "fulfilled"].includes(order.status) || !canReadOrder(req, order)) {
@@ -52,9 +53,12 @@ export async function GET(
   }
 
   try {
+    const galeriaInfo = Array.isArray(order.galleries) ? order.galleries[0] : order.galleries;
+    const photographerId = (galeriaInfo as { photographer_id: string } | undefined)?.photographer_id;
+    const account = photographerId ? await getDriveAccount(photographerId) : {};
     const [meta, fileRes] = await Promise.all([
-      getDriveFileMeta(midia.drive_file_id),
-      fetchDriveFileStream(midia.drive_file_id),
+      getDriveFileMeta(account, midia.drive_file_id),
+      fetchDriveFileStream(account, midia.drive_file_id),
     ]);
 
     return new NextResponse(fileRes.body, {

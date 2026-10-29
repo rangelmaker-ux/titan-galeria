@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { deletePreview } from "@/lib/r2";
 import { deleteDriveFile } from "@/lib/drive";
+import { getDriveAccount } from "@/lib/drive-account";
 import { friendlyPlanError } from "@/lib/plans";
 
 const bodySchema = z.object({
@@ -86,7 +87,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   // limpeza best-effort dos arquivos — não bloqueia a resposta se falhar.
   if (midia?.r2_key_preview) deletePreview(midia.r2_key_preview).catch(() => {});
-  if (midia?.drive_file_id) deleteDriveFile(midia.drive_file_id).catch(() => {});
+  if (midia?.drive_file_id) getDriveAccount(user.id).then((account) => deleteDriveFile(account, midia.drive_file_id!)).catch(() => {});
 
   return NextResponse.json({ ok: true });
 }

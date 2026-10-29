@@ -1,5 +1,8 @@
-/** Armazenamento dos arquivos ORIGINAIS (alta resolução) no Google Drive da
- * conta do dono da plataforma — igual ao padrão usado no Titan Sounds. Os
+/** Armazenamento dos arquivos ORIGINAIS (alta resolução) no Google Drive.
+ * Cada fotógrafo pode conectar o próprio Drive (ver /api/drive/connect) —
+ * nesse caso usamos o refresh_token dele, salvo em photographers.drive_*.
+ * Quem ainda não conectou continua usando a conta do administrador
+ * (GOOGLE_REFRESH_TOKEN no .env), igual ao comportamento original. Os
  * previews com marca d'água continuam no Cloudflare R2 (ver src/lib/r2.ts),
  * que já é público e rápido pra exibir na galeria.
  *
@@ -11,66 +14,103 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3/files";
 
-let cachedToken: { accessToken: string; expiresAt: number } | null = null;
+/** Credenciais de qual Drive usar. `refreshToken`/`rootFolderId` ausentes ou
+ * nulos caem no fallback da conta do administrador (compatibilidade). */
+export type DriveAccount = { refreshToken?: string | null; rootFolderId?: string | null };
 
-async function getAccessToken(): Promise<string> {
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 30_000) {
-    return cachedToken.accessToken;
-  }
+const tokenCache = new Map<string, { accessToken: string; expiresAt: number }>();
+
+async function getAccessToken(refreshToken?: string | null): Promise<string> {
+  const token = refreshToken || process.env.GOOGLE_REFRESH_TOKEN!;
+  const cacheKey = token;
+  const cached = tokenCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now() + 30_000) return cached.accessToken;
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID!,
       client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      refresh_token: process.env.GOOGLE_REFRESH_TOKEN!,
+      refresh_token: token,
       grant_type: "refresh_token",
     }),
   });
   if (!res.ok) throw new Error("falha ao renovar token do Google Drive: " + (await res.text()));
   const data = await res.json();
-  cachedToken = { accessToken: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
-  return cachedToken.accessToken;
+  tokenCache.set(cacheKey, { accessToken: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 });
+  return data.access_token;
 }
 
-/** Garante (criando se preciso) a pasta da galeria dentro da pasta raiz
- * "Titan Galeria" configurada em GOOGLE_DRIVE_ROOT_FOLDER_ID. Idempotente:
- * se já existe uma pasta com esse nome ali dentro, reaproveita. */
-export async function ensureGalleryFolder(galleryId: string, galleryTitle: string): Promise<string> {
-  const token = await getAccessToken();
-  const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID!;
-  const folderName = `${galleryTitle} (${galleryId.slice(0, 8)})`.replace(/'/g, "\\'");
-
+async function findFolder(token: string, name: string, parentId: string): Promise<string | null> {
   const q = encodeURIComponent(
-    `'${rootFolderId}' in parents and name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`
+    `'${parentId}' in parents and name = '${name.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`
   );
-  const searchRes = await fetch(`${DRIVE_API}/files?q=${q}&fields=files(id)`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (searchRes.ok) {
-    const searchData = await searchRes.json();
-    if (searchData.files?.[0]?.id) return searchData.files[0].id;
-  }
+  const res = await fetch(`${DRIVE_API}/files?q=${q}&fields=files(id)`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.files?.[0]?.id ?? null;
+}
 
-  const createRes = await fetch(`${DRIVE_API}/files?fields=id`, {
+async function createFolder(token: string, name: string, parentId: string): Promise<string> {
+  const res = await fetch(`${DRIVE_API}/files?fields=id`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: folderName,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: [rootFolderId],
-    }),
+    body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder", parents: [parentId] }),
   });
-  if (!createRes.ok) throw new Error("falha ao criar pasta no Drive: " + (await createRes.text()));
-  const created = await createRes.json();
+  if (!res.ok) throw new Error("falha ao criar pasta no Drive: " + (await res.text()));
+  const created = await res.json();
   return created.id;
+}
+
+/** Chamado uma vez, logo depois do fotógrafo autorizar o próprio Drive:
+ * garante a pasta raiz "Titan Galeria" na raiz do Drive dele (idempotente —
+ * se ele desconectar e conectar de novo, reaproveita a mesma pasta). */
+export async function ensureDriveRoot(refreshToken: string): Promise<string> {
+  const token = await getAccessToken(refreshToken);
+  const existing = await findFolder(token, "Titan Galeria", "root");
+  if (existing) return existing;
+  return createFolder(token, "Titan Galeria", "root");
+}
+
+/** Pega os dados básicos da conta Google conectada (pra mostrar "conectado
+ * como fulano@gmail.com" nas configurações). */
+export async function getDriveAccountEmail(refreshToken: string): Promise<string | null> {
+  const token = await getAccessToken(refreshToken);
+  const res = await fetch(`${DRIVE_API}/about?fields=user(emailAddress)`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.user?.emailAddress ?? null;
+}
+
+/** Garante (criando se preciso) a pasta de uma tag (ex: "Aniversário") direto
+ * dentro da raiz "Titan Galeria" do fotógrafo. Reaproveita se já existir uma
+ * com esse nome, pra próxima galeria com a mesma tag cair no mesmo lugar. */
+export async function ensureTagFolder(account: DriveAccount, tagName: string): Promise<string> {
+  const token = await getAccessToken(account.refreshToken);
+  const rootFolderId = account.rootFolderId || process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID!;
+  const existing = await findFolder(token, tagName, rootFolderId);
+  if (existing) return existing;
+  return createFolder(token, tagName, rootFolderId);
+}
+
+/** Garante (criando se preciso) a pasta da galeria — dentro da pasta da tag,
+ * se a galeria tiver uma, senão direto na raiz "Titan Galeria". Idempotente:
+ * se já existe uma pasta com esse nome ali dentro, reaproveita. */
+export async function ensureGalleryFolder(account: DriveAccount, galleryId: string, galleryTitle: string, parentFolderId?: string | null): Promise<string> {
+  const token = await getAccessToken(account.refreshToken);
+  const rootFolderId = parentFolderId || account.rootFolderId || process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID!;
+  const folderName = `${galleryTitle} (${galleryId.slice(0, 8)})`;
+
+  const existing = await findFolder(token, folderName, rootFolderId);
+  if (existing) return existing;
+  return createFolder(token, folderName, rootFolderId);
 }
 
 /** Inicia uma sessão de upload resumível do Drive — o navegador do
  * fotógrafo envia o arquivo original direto pro Drive (sem passar pelo
  * nosso servidor), igual ao fluxo de URL assinada que já usamos com o R2. */
-export async function createDriveUploadSession(folderId: string, fileName: string, mimeType: string, sizeBytes: number) {
-  const token = await getAccessToken();
+export async function createDriveUploadSession(account: DriveAccount, folderId: string, fileName: string, mimeType: string, sizeBytes: number) {
+  const token = await getAccessToken(account.refreshToken);
   const res = await fetch(`${DRIVE_UPLOAD_API}?uploadType=resumable&fields=id`, {
     method: "POST",
     headers: {
@@ -89,8 +129,8 @@ export async function createDriveUploadSession(folderId: string, fileName: strin
 
 /** Confere a mesma sessão quando o Drive recebe o arquivo mas o navegador
  * perde a resposta. Não cria outro arquivo nem recebe o original no servidor. */
-export async function queryDriveUpload(uploadUrl: string, sizeBytes: number) {
-  const token = await getAccessToken();
+export async function queryDriveUpload(account: DriveAccount, uploadUrl: string, sizeBytes: number) {
+  const token = await getAccessToken(account.refreshToken);
   const res = await fetch(uploadUrl, {
     method: "PUT", redirect: "manual", cache: "no-store",
     headers: { Authorization: `Bearer ${token}`, "Content-Range": `bytes */${sizeBytes}`, "Content-Length": "0" },
@@ -114,8 +154,8 @@ export async function queryDriveUpload(uploadUrl: string, sizeBytes: number) {
 /** Baixa o conteúdo de um arquivo original — só chamado depois de pagamento
  * confirmado, via proxy do nosso servidor (o arquivo nunca fica público no
  * Drive). Retorna o Response cru pra podermos repassar o body como stream. */
-export async function fetchDriveFileStream(fileId: string) {
-  const token = await getAccessToken();
+export async function fetchDriveFileStream(account: DriveAccount, fileId: string) {
+  const token = await getAccessToken(account.refreshToken);
   const res = await fetch(`${DRIVE_API}/files/${fileId}?alt=media`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -123,8 +163,8 @@ export async function fetchDriveFileStream(fileId: string) {
   return res;
 }
 
-export async function getDriveFileMeta(fileId: string) {
-  const token = await getAccessToken();
+export async function getDriveFileMeta(account: DriveAccount, fileId: string) {
+  const token = await getAccessToken(account.refreshToken);
   const res = await fetch(`${DRIVE_API}/files/${fileId}?fields=name,mimeType,size`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -132,8 +172,8 @@ export async function getDriveFileMeta(fileId: string) {
   return res.json() as Promise<{ name: string; mimeType: string; size?: string }>;
 }
 
-export async function deleteDriveFile(fileId: string) {
-  const token = await getAccessToken();
+export async function deleteDriveFile(account: DriveAccount, fileId: string) {
+  const token = await getAccessToken(account.refreshToken);
   await fetch(`${DRIVE_API}/files/${fileId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },

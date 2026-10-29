@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { friendlyPlanError } from "@/lib/plans";
@@ -19,8 +19,17 @@ export default function NovaGaleriaPage() {
   const supabase = createClient();
   const [titulo, setTitulo] = useState("");
   const [cliente, setCliente] = useState("");
+  const [tag, setTag] = useState("");
+  const [tagsExistentes, setTagsExistentes] = useState<string[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/drive/tags")
+      .then((r) => r.json())
+      .then((d) => setTagsExistentes((d.tags ?? []).map((t: { name: string }) => t.name)))
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,6 +46,25 @@ export default function NovaGaleriaPage() {
       return;
     }
 
+    // Se digitou uma tag (ex: "Aniversário"), garante a pasta no Drive dela
+    // antes de criar a galeria — reaproveita se já existir essa tag.
+    let driveTagId: string | null = null;
+    const tagLimpa = tag.trim();
+    if (tagLimpa) {
+      const res = await fetch("/api/drive/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: tagLimpa }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErro(data.error || "Não foi possível salvar a tag.");
+        setCarregando(false);
+        return;
+      }
+      driveTagId = data.id;
+    }
+
     const { data, error } = await supabase
       .from("galleries")
       .insert({
@@ -44,6 +72,7 @@ export default function NovaGaleriaPage() {
         title: titulo,
         slug: slugify(titulo) + "-" + Math.random().toString(36).slice(2, 6),
         client_name: cliente || null,
+        drive_tag_id: driveTagId,
       })
       .select("id")
       .single();
@@ -78,6 +107,23 @@ export default function NovaGaleriaPage() {
             onChange={(e) => setCliente(e.target.value)}
             className="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm"
           />
+        </label>
+        <label className="text-sm">
+          Tag (opcional)
+          <input
+            list="tags-existentes"
+            value={tag}
+            onChange={(e) => setTag(e.target.value)}
+            placeholder="Ex: Aniversário, Casamento…"
+            className="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm"
+          />
+          <datalist id="tags-existentes">
+            {tagsExistentes.map((t) => <option key={t} value={t} />)}
+          </datalist>
+          <span className="mt-1 block text-xs text-neutral-500">
+            As fotos originais dessa galeria vão pra uma pasta com esse nome no seu Drive — use a
+            mesma tag de novo e ela cai na mesma pasta.
+          </span>
         </label>
 
         {erro && <p className="text-sm text-red-600">{erro}</p>}
