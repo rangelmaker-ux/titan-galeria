@@ -45,6 +45,25 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
     previewUrl: publicPreviewUrl(m.r2_key_preview!),
   }));
 
+  // Fotos que os clientes favoritaram/escolheram (coraçãozinho) na galeria
+  // pública — serve pra montar um pacote sob medida mesmo antes da compra.
+  const { data: favoritosRaw } = midiasComUrl.length
+    ? await supabase
+        .from("media_selections")
+        .select("media_id, client_identifier")
+        .eq("favorited", true)
+        .in("media_id", midiasComUrl.map((m) => m.id))
+    : { data: [] as { media_id: string; client_identifier: string }[] };
+  const previewPorMidia = new Map(midiasComUrl.map((m) => [m.id, m.previewUrl]));
+  const favoritosPorCliente = new Map<string, { previewUrl: string }[]>();
+  for (const f of favoritosRaw ?? []) {
+    const url = previewPorMidia.get(f.media_id);
+    if (!url) continue;
+    const lista = favoritosPorCliente.get(f.client_identifier) ?? [];
+    lista.push({ previewUrl: url });
+    favoritosPorCliente.set(f.client_identifier, lista);
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -69,6 +88,29 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
       <GallerySettingsForm galeria={galeria} previewPhotos={midiasComUrl.filter((m) => m.type === "photo").slice(0, 8).map((m) => m.previewUrl)} />
 
       <section className="rounded-xl border border-neutral-200 bg-white p-5"><h2 className="font-semibold">Vender arquivos deste álbum</h2><p className="mt-2 text-sm text-neutral-600">Crie uma oferta de download por arquivo, pacote completo ou impressão vinculada a esta galeria. Seus clientes pagam no seu Pix.</p><a href={`/painel/produtos?galeria=${galeria.id}`} className="mt-3 inline-block text-sm underline">Configurar produtos e preços desta galeria →</a></section>
+
+      {favoritosPorCliente.size > 0 && (
+        <section className="rounded-xl border border-neutral-200 bg-white p-5">
+          <h2 className="font-semibold">Fotos escolhidas pelos clientes</h2>
+          <p className="mt-2 text-sm text-neutral-600">
+            Toque no coraçãozinho na galeria pública marca estas fotos. Se não houver preço por
+            arquivo cadastrado ainda, use essa lista pra montar um pacote sob medida e combinar o
+            valor direto com o cliente.
+          </p>
+          <div className="mt-4 flex flex-col gap-4">
+            {[...favoritosPorCliente.entries()].map(([cliente, fotos]) => (
+              <div key={cliente}>
+                <p className="mb-2 text-sm font-medium">{cliente} · {fotos.length} {fotos.length === 1 ? "foto" : "fotos"}</p>
+                <div className="flex flex-wrap gap-2">
+                  {fotos.map((f, i) => (
+                    <img key={i} src={f.previewUrl} alt="" className="h-16 w-16 rounded-md object-cover" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">

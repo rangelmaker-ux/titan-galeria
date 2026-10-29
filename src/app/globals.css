@@ -6,6 +6,13 @@ html {
   color-scheme: light;
 }
 
+/* Nunca deixa a página rolar pro lado no celular, mesmo se algum elemento
+ * acabar ficando mais largo que a tela. */
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
 body {
   @apply bg-paper text-ink antialiased;
 }

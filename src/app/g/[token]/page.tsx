@@ -24,7 +24,7 @@ export default async function GaleriaPublicaPage({
   const { data: galeria } = await supabase
     .from("galleries")
     .select(
-      "id, title, client_name, password_hash, allow_favorites, allow_downloads, photographer_id, template, realtime_mode"
+      "id, title, client_name, password_hash, allow_favorites, allow_downloads, photographer_id, template, realtime_mode, is_published"
     )
     .eq("share_token", params.token)
     .single();
@@ -63,6 +63,21 @@ export default async function GaleriaPublicaPage({
     previewUrl: publicPreviewUrl(m.r2_key_preview!),
   }));
 
+  // Portfólio público (sem venda) usa o coraçãozinho como curtida simples,
+  // sem pedir nome de pagador — por isso aqui já soma quantas curtidas cada
+  // foto tem pra mostrar junto do ícone.
+  const likeCounts: Record<string, number> = {};
+  if (galeria.is_published && midiasComUrl.length) {
+    const { data: favoritosRaw } = await supabase
+      .from("media_selections")
+      .select("media_id")
+      .eq("favorited", true)
+      .in("media_id", midiasComUrl.map((m) => m.id));
+    for (const row of favoritosRaw ?? []) {
+      likeCounts[row.media_id] = (likeCounts[row.media_id] ?? 0) + 1;
+    }
+  }
+
   return (
     <ClientGalleryView
       shareToken={params.token}
@@ -77,6 +92,8 @@ export default async function GaleriaPublicaPage({
       marcaTitan={marcaTitan}
       template={galeria.template}
       aoVivo={galeria.realtime_mode}
+      isPortfolio={galeria.is_published}
+      likeCounts={likeCounts}
     />
   );
 }
