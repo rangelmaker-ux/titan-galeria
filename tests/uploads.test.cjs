@@ -84,7 +84,7 @@ for (const [status, range, expected] of [[200, null, 'complete'], [308, 'bytes=0
       if (url.includes('oauth2')) return { ok: true, json: async () => ({ access_token: 'fixture', expires_in: 3600 }) };
       return { ok: status === 200, status, headers: { get: () => range }, json: async () => ({ id: 'file-id' }) };
     } });
-    const result = await drive.queryDriveUpload(binding.uploadUrl, 100);
+    const result = await drive.queryDriveUpload({refreshToken:"fixture"}, binding.uploadUrl, 100);
     if (expected === 'complete') assert.equal(result.fileId, 'file-id');
     else if (expected === 'expired') assert.equal(result.expired, true);
     else assert.equal(result.receivedBytes, expected);

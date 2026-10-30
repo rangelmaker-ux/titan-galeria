@@ -97,13 +97,13 @@ for (const status of ['active', 'trialing', 'past_due', 'unpaid']) {
     const handler = load('src/app/api/assinatura/checkout/route.ts', {
       'next/server': { NextResponse: { json: (body, init) => ({ body, status: init?.status || 200 }) } },
       '@/lib/supabase/server': { createClient: () => ({ auth: { getUser: async () => ({ data: { user: { id: 'user' } } }) }, from: () => query }) },
-      '@/lib/plans': { PLANS: { profissional: { stripePriceId: 'price_test' } } },
+      '@/lib/plans': { BILLING_OPTIONS: { mensal: { stripePriceId: 'price_test' } } },
       '@/lib/stripe': { stripe: {
         checkout: { sessions: { create: async () => { checkouts++; return { url: 'checkout' }; } } },
         billingPortal: { sessions: { create: async () => { portals++; return { url: 'portal' }; } } },
       } },
     });
-    const response = await handler.POST({ json: async () => ({ plano: 'profissional' }) });
+    const response = await handler.POST({ json: async () => ({ intervalo: 'mensal' }) });
     assert.equal(response.body.url, 'portal'); assert.equal(checkouts, 0); assert.equal(portals, 1);
   });
 }
