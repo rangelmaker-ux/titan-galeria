@@ -6,7 +6,14 @@ import { deletePreview } from "@/lib/r2";
 import { deleteDriveFolder } from "@/lib/drive";
 import { getDriveAccount } from "@/lib/drive-account";
 
+const coverSchema = z.object({
+  mediaId: z.string().uuid().nullable(), opacity: z.number().int().min(0).max(100), position: z.number().int().min(0).max(100),
+  title: z.string().trim().max(160), subtitle: z.string().trim().max(300), signature: z.string().trim().max(120),
+  date: z.string().refine((v) => !v || (/^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v)),
+  titleFont: z.enum(["sans", "serif", "editorial", "mono", "cursive"]), textFont: z.enum(["sans", "serif", "editorial", "mono", "cursive"]),
+});
 const bodySchema = z.object({
+  cover: coverSchema.optional(),
   isPublished: z.boolean().optional(),
   allowFavorites: z.boolean().optional(),
   allowDownloads: z.boolean().optional(),
@@ -36,6 +43,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   } = parsed.data;
 
   const update: Record<string, unknown> = {};
+  if (parsed.data.cover) {
+    const { data: owned } = await supabase.from("galleries").select("id").eq("id", params.id).eq("photographer_id", user.id).is("deleted_at", null).single();
+    if (!owned) return NextResponse.json({ error: "Galeria não encontrada." }, { status: 404 });
+    if (parsed.data.cover.mediaId) {
+      const { data: photo } = await supabase.from("media").select("id").eq("id", parsed.data.cover.mediaId).eq("gallery_id", params.id).eq("type", "photo").single();
+      if (!photo) return NextResponse.json({ error: "Escolha uma foto desta galeria para a capa." }, { status: 400 });
+    }
+    update.delivery_design = parsed.data.cover;
+  }
   if (isPublished !== undefined) update.is_published = isPublished;
   if (allowFavorites !== undefined) update.allow_favorites = allowFavorites;
   if (allowDownloads !== undefined) update.allow_downloads = allowDownloads;

@@ -24,7 +24,7 @@ export default async function GaleriaPublicaPage({
   const { data: galeria } = await supabase
     .from("galleries")
     .select(
-      "id, title, client_name, password_hash, allow_favorites, allow_downloads, photographer_id, template, realtime_mode, is_published"
+      "id, title, client_name, password_hash, allow_favorites, allow_downloads, photographer_id, template, realtime_mode, is_published, delivery_design"
     )
     .eq("share_token", params.token)
     .is("deleted_at", null)
@@ -54,7 +54,7 @@ export default async function GaleriaPublicaPage({
 
   const { data: fotografo } = await supabase
     .from("photographers")
-    .select("plan")
+    .select("plan, display_name")
     .eq("id", galeria.photographer_id)
     .single();
   const marcaTitan = !getPlan(fotografo?.plan).marcaPropria;
@@ -81,6 +81,8 @@ export default async function GaleriaPublicaPage({
 
   return (
     <ClientGalleryView
+      cover={galeria.delivery_design}
+      photographerName={fotografo?.display_name || ""}
       shareToken={params.token}
       title={galeria.title}
       clientName={galeria.client_name}

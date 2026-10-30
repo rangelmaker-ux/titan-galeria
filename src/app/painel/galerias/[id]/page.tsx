@@ -1,3 +1,4 @@
+import { CoverForm } from "./cover-form";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { publicPreviewUrl } from "@/lib/r2";
@@ -101,6 +102,8 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
       </section>
 
       <MediaGrid galleryId={galeria.id} midias={midiasComUrl} />
+
+      <CoverForm galleryId={galeria.id} title={galeria.title} photographer={fotografo?.display_name || ""} initial={galeria.delivery_design} photos={midiasComUrl.filter((m) => m.type === "photo")} />
 
       <GallerySettingsForm galeria={galeria} previewPhotos={midiasComUrl.filter((m) => m.type === "photo").slice(0, 8).map((m) => m.previewUrl)} />
 
