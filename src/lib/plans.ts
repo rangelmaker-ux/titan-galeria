@@ -67,14 +67,14 @@ export interface PlanDef {
 export const PLANS: Record<PlanId, PlanDef> = {
   gratuito: {
     id: "gratuito",
-    nome: "Gratuito",
+    nome: "Teste gratuito de três dias",
     galeriasLimite: null,
-    todosTiposProduto: false,
-    marcaPropria: false,
-    armazenamentoLabel: "5 fotos ou 1 vídeo (até 15MB) por mês",
+    todosTiposProduto: true,
+    marcaPropria: true,
+    armazenamentoLabel: "Seu próprio Google Drive — acesso completo durante o teste",
     usuariosLabel: "1 (só o dono)",
     suporteLabel: "Comunidade",
-    uploadsGratisLabel: "5 fotos/mês ou 1 vídeo de até 15MB/mês",
+    uploadsGratisLabel: "Todas as ferramentas por 72 horas",
   },
   titan: {
     id: "titan",

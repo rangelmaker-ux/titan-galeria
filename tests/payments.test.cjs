@@ -96,7 +96,7 @@ for (const status of ['active', 'trialing', 'past_due', 'unpaid']) {
     const query = { select() { return query; }, eq() { return query; }, single: async () => ({ data: { id: 'user', stripe_customer_id: 'cus_test', subscription_status: status } }) };
     const handler = load('src/app/api/assinatura/checkout/route.ts', {
       'next/server': { NextResponse: { json: (body, init) => ({ body, status: init?.status || 200 }) } },
-      '@/lib/supabase/server': { createClient: () => ({ auth: { getUser: async () => ({ data: { user: { id: 'user' } } }) }, from: () => query }) },
+      '@/lib/supabase/server': { createClient: () => ({ auth: { getUser: async () => ({ data: { user: { id: 'user', email: 'buyer@example.test' } } }) }, from: () => query }) },
       '@/lib/plans': { BILLING_OPTIONS: { mensal: { stripePriceId: 'price_test' } } },
       '@/lib/stripe': { stripe: {
         checkout: { sessions: { create: async () => { checkouts++; return { url: 'checkout' }; } } },

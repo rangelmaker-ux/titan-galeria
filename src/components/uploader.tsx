@@ -26,7 +26,6 @@ export function Uploader({ galleryId, watermark, plano }: Props) {
       const video = file.type.startsWith("video/");
       if (!file.type.startsWith("image/") && !video) throw new Error("Selecione uma foto ou um vídeo compatível.");
       if (!file.size) throw new Error("O arquivo está vazio.");
-      if (plano === "gratuito" && video && file.size > 15 * 1024 * 1024) throw new Error("O plano gratuito permite vídeos de até 15 MB.");
       if (!item.previewKey) {
         update(item, 2, video ? "Preparando vídeo" : "Preparando prévia");
         if (!video) {

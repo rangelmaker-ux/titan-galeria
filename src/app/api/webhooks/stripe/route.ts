@@ -14,30 +14,26 @@ function mapSubscriptionStatus(stripeStatus: string): string {
   return validos.includes(stripeStatus) ? stripeStatus : "inactive";
 }
 
-async function syncSubscription(subscription: any) {
-  const supabase = createServiceClient();
-  const priceId = subscription.items?.data?.[0]?.price?.id as string | undefined;
-  const plano = planFromStripePriceId(priceId);
-  const intervalo = billingIntervalFromStripePriceId(priceId);
-  const photographerId = subscription.metadata?.photographerId as string | undefined;
-
-  const update: Record<string, any> = {
-    stripe_subscription_id: subscription.id,
-    stripe_customer_id: subscription.customer,
-    subscription_status: mapSubscriptionStatus(subscription.status),
-    subscription_current_period_end: subscription.current_period_end
-      ? new Date(subscription.current_period_end * 1000).toISOString()
-      : null,
-  };
-  if (plano) update.billing_plan = plano;
-  if (intervalo) update.billing_interval = intervalo;
-
-  let query = supabase.from("photographers").update(update);
-  query = photographerId
-    ? query.eq("id", photographerId)
-    : query.eq("stripe_customer_id", subscription.customer);
-
-  await query;
+function objectId(value: any): string | undefined { return typeof value === "string" ? value : value?.id; }
+async function syncSubscription(id: string, eventCreated: number, emailHint?: string) {
+  // Read current Stripe state so a late/replayed webhook cannot restore canceled access.
+  const subscription = await stripe.subscriptions.retrieve(id, { expand: ["latest_invoice", "customer"] });
+  const customer = subscription.customer as any;
+  const customerId = objectId(customer);
+  const email = (emailHint || customer.email || "").trim().toLowerCase();
+  const priceId = subscription.items.data[0]?.price.id;
+  if (!planFromStripePriceId(priceId)) return; // Ignore unrelated Stripe products.
+  if (!email || !customerId) throw new Error("missing_billing_email");
+  const invoice = subscription.latest_invoice as any;
+  const invoicePaid = invoice && typeof invoice !== "string" && invoice.status === "paid" && invoice.paid === true;
+  const periodEnd = subscription.current_period_end;
+  const paidUntil = invoicePaid && subscription.status === "active" && periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
+  const { error } = await createServiceClient().rpc("sync_titan_subscription", { payload: {
+    subscriptionId: subscription.id, customerId, email, accountId: subscription.metadata?.photographerId || null,
+    status: mapSubscriptionStatus(subscription.status), paidUntil,
+    interval: billingIntervalFromStripePriceId(priceId), eventCreated,
+  } });
+  if (error) throw new Error("billing_sync_failed");
 }
 
 export async function POST(req: NextRequest) {
@@ -55,22 +51,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `assinatura inválida: ${err.message}` }, { status: 400 });
   }
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object as any;
-
-    if (session.mode === "subscription") {
-      // assinatura da Titan Galeria (fotógrafo pagando a plataforma) —
-      // grava o customer id na hora; os detalhes do plano/status chegam
-      // pelo customer.subscription.updated logo em seguida.
-      const photographerId = session.metadata?.photographerId;
-      if (photographerId && session.customer) {
-        const supabase = createServiceClient();
-        await supabase
-          .from("photographers")
-          .update({ stripe_customer_id: session.customer })
-          .eq("id", photographerId);
-      }
+  try {
+    const object = event.data.object as any;
+    if (["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type) && object.mode === "subscription" && object.payment_status === "paid") {
+      const id = objectId(object.subscription);
+      if (id) await syncSubscription(id, event.created, object.customer_details?.email || object.customer_email);
     }
+    if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(event.type)) {
+      await syncSubscription(object.id, event.created);
+    }
+    if (["invoice.paid", "invoice.payment_failed"].includes(event.type)) {
+      const id = objectId(object.subscription || object.parent?.subscription_details?.subscription);
+      if (id) await syncSubscription(id, event.created);
+    }
+  } catch {
+    return NextResponse.json({ error: "Não foi possível sincronizar o acesso. O Stripe tentará novamente." }, { status: 500 });
   }
 
   if (
@@ -107,22 +102,6 @@ export async function POST(req: NextRequest) {
         .eq("status", "pending");
       if (error) return NextResponse.json({ error: "não foi possível atualizar o pedido" }, { status: 500 });
     }
-  }
-
-  if (
-    event.type === "customer.subscription.updated" ||
-    event.type === "customer.subscription.created"
-  ) {
-    await syncSubscription(event.data.object as any);
-  }
-
-  if (event.type === "customer.subscription.deleted") {
-    const subscription = event.data.object as any;
-    const supabase = createServiceClient();
-    await supabase
-      .from("photographers")
-      .update({ subscription_status: "canceled", billing_plan: "gratuito", billing_interval: null })
-      .eq("stripe_customer_id", subscription.customer);
   }
 
   return NextResponse.json({ received: true });

@@ -37,7 +37,7 @@ export default function PrecosPage() {
         </ul>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <p className="mb-6 text-center text-sm text-neutral-600">Experimente todas as ferramentas por três dias, sem cartão. <Link href="/entrar" className="underline">Criar conta para testar</Link>.</p><div className="grid gap-6 md:grid-cols-3">
         {BILLING_ORDER.map((interval) => {
           const op = BILLING_OPTIONS[interval];
           return (
@@ -59,7 +59,7 @@ export default function PrecosPage() {
               </p>
               {op.economiaLabel && <p className="mt-1 text-sm text-neutral-500">{op.economiaLabel}</p>}
               <Link
-                href="/entrar"
+                href="/assinar"
                 className={`mt-6 rounded-full px-6 py-3 text-center text-sm font-medium transition ${
                   op.destaque ? "bg-ink text-paper hover:opacity-90" : "border border-neutral-300 hover:bg-neutral-100"
                 }`}
