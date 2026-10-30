@@ -12,6 +12,7 @@ export default async function PainelGaleriasPage() {
     .from("galleries")
     .select("id, title, slug, client_name, is_published, share_token, created_at")
     .eq("photographer_id", user?.id)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   // Capa: a primeira foto enviada, independentemente de reordenações posteriores.

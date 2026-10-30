@@ -51,6 +51,20 @@ export function GallerySettingsForm({ galeria, previewPhotos = [] }: { galeria: 
     finally { setSalvando(false); }
   }
 
+  async function excluirGaleria() {
+    if (!confirm("Excluir esta galeria? A pasta no Google Drive e as fotos dela somem. Não dá pra desfazer.")) return;
+    setSalvando(true); setErro(null);
+    try {
+      const res = await fetch(`/api/galerias/${galeria.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Não foi possível excluir a galeria.");
+      router.push("/painel");
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : "Falha de conexão. Tente novamente.");
+      setSalvando(false);
+    }
+  }
+
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Configurações</h2>
@@ -87,6 +101,21 @@ export function GallerySettingsForm({ galeria, previewPhotos = [] }: { galeria: 
       </div>
       {erro && <p role="alert" className="text-sm text-red-700">{erro}</p>}
       {aviso && <p role="status" className="text-sm text-green-700">{aviso}</p>}
+
+      <div className="mt-2 border-t border-neutral-200 pt-5">
+        <button
+          type="button"
+          disabled={salvando}
+          onClick={() => void excluirGaleria()}
+          className="text-sm text-red-700 underline disabled:opacity-50"
+        >
+          Excluir esta galeria
+        </button>
+        <p className="mt-1 text-xs text-neutral-500">
+          A galeria sai da sua lista e do link público, e a pasta dela no Google Drive é excluída. O
+          histórico de pedidos já feitos continua guardado, caso precise consultar depois.
+        </p>
+      </div>
     </section>
   );
 }

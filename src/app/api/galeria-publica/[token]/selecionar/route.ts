@@ -16,6 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     .from("galleries")
     .select("id, allow_favorites")
     .eq("share_token", params.token)
+    .is("deleted_at", null)
     .single();
   if (!galeria) return NextResponse.json({ error: "galeria não encontrada" }, { status: 404 });
   if (!galeria.allow_favorites) {

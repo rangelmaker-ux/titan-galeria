@@ -179,3 +179,10 @@ export async function deleteDriveFile(account: DriveAccount, fileId: string) {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+/** Exclui a pasta da galeria inteira no Drive. A API do Drive, ao excluir
+ * uma pasta (DELETE, não trashed), já exclui em cascata todos os arquivos
+ * que estão dentro dela — não é preciso excluir arquivo por arquivo antes. */
+export async function deleteDriveFolder(account: DriveAccount, folderId: string) {
+  await deleteDriveFile(account, folderId);
+}

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { createClient } from "@/lib/supabase/server";
+import { deletePreview } from "@/lib/r2";
+import { deleteDriveFolder } from "@/lib/drive";
+import { getDriveAccount } from "@/lib/drive-account";
 
 const bodySchema = z.object({
   isPublished: z.boolean().optional(),
@@ -50,5 +53,52 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .eq("photographer_id", user.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ ok: true });
+}
+
+/** Arquiva a galeria em vez de apagar a linha: um DELETE de verdade apagaria
+ * em cascata os pedidos/pagamentos dela (constraint da migration 0001). A
+ * galeria some do painel e do link público; a pasta no Drive e as prévias
+ * no R2 (armazenamento, não registro financeiro) são excluídas de verdade,
+ * em melhor esforço — se alguma falhar, a galeria já está arquivada e não
+ * aparece mais pra ninguém, então não travamos a resposta por isso. */
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "não autenticado" }, { status: 401 });
+
+  const { data: galeria } = await supabase
+    .from("galleries")
+    .select("id, drive_folder_id")
+    .eq("id", params.id)
+    .eq("photographer_id", user.id)
+    .is("deleted_at", null)
+    .single();
+  if (!galeria) return NextResponse.json({ error: "galeria não encontrada" }, { status: 404 });
+
+  const { data: midias } = await supabase
+    .from("media")
+    .select("r2_key_preview")
+    .eq("gallery_id", params.id);
+
+  const { error } = await supabase
+    .from("galleries")
+    .update({ deleted_at: new Date().toISOString(), is_published: false })
+    .eq("id", params.id)
+    .eq("photographer_id", user.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // limpeza best-effort — não bloqueia a resposta se falhar.
+  for (const m of midias ?? []) {
+    if (m.r2_key_preview) deletePreview(m.r2_key_preview).catch(() => {});
+  }
+  if (galeria.drive_folder_id) {
+    getDriveAccount(user.id)
+      .then((account) => deleteDriveFolder(account, galeria.drive_folder_id!))
+      .catch(() => {});
+  }
+
   return NextResponse.json({ ok: true });
 }

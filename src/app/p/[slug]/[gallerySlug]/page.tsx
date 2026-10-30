@@ -27,6 +27,7 @@ export default async function GaleriaPublicadaPage({
     .eq("photographer_id", fotografo.id)
     .eq("slug", params.gallerySlug)
     .eq("is_published", true)
+    .is("deleted_at", null)
     .single();
   if (!galeria) notFound();
 

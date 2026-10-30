@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   const { shareToken, productId, clientIdentifier, clientEmail, requestId, accessToken } = parsed.data;
   const supabase = createServiceClient();
-  const { data: galeria } = await supabase.from("galleries").select("id, title, photographer_id, password_hash").eq("share_token", shareToken).single();
+  const { data: galeria } = await supabase.from("galleries").select("id, title, photographer_id, password_hash").eq("share_token", shareToken).is("deleted_at", null).single();
   if (!galeria) return NextResponse.json({ error: "galeria não encontrada" }, { status: 404 });
   if (galeria.password_hash && req.cookies.get(`g_${shareToken}_ok`)?.value !== "1") return NextResponse.json({ error: "desbloqueie a galeria primeiro" }, { status: 403 });
   const { data: produto } = await supabase.from("products").select("id, name, price_cents, currency, type, active")

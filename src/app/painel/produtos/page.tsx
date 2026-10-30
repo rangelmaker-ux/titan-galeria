@@ -14,7 +14,7 @@ export default async function ProdutosPage({ searchParams }: { searchParams: { g
   const [{ data: produtos, error }, { data: galleries, error: galleryError }] = await Promise.all([
     supabase.from("products").select("id, type, name, price_cents, currency, print_size, active, gallery_id")
       .eq("photographer_id", user?.id).is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("galleries").select("id, title").eq("photographer_id", user?.id).order("created_at", { ascending: false }),
+    supabase.from("galleries").select("id, title").eq("photographer_id", user?.id).is("deleted_at", null).order("created_at", { ascending: false }),
   ]);
 
   return (

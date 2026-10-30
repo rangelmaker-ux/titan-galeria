@@ -27,6 +27,7 @@ export default async function GaleriaPublicaPage({
       "id, title, client_name, password_hash, allow_favorites, allow_downloads, photographer_id, template, realtime_mode, is_published"
     )
     .eq("share_token", params.token)
+    .is("deleted_at", null)
     .single();
   if (!galeria) notFound();
 

@@ -24,6 +24,7 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
     .select("*")
     .eq("id", params.id)
     .eq("photographer_id", user?.id)
+    .is("deleted_at", null)
     .single();
 
   if (!galeria) notFound();
