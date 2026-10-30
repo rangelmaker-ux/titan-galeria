@@ -21,7 +21,6 @@ export default async function PainelLayout({ children }: { children: React.React
     ...(isAdmin(user) ? [{ href: "/painel/admin", label: "Administração · planos" }] : []),
     { href: "/painel", label: "Galerias" },
     { href: "/painel/produtos", label: "Produtos" },
-    { href: "/painel/assinatura", label: "Assinatura" },
     { href: "/painel/ganhos", label: "Meus ganhos" },
     { href: "/painel/configuracoes", label: "Meu perfil" },
     ...(fotografo?.slug ? [{ href: `/p/${fotografo.slug}`, label: "Ver portfólio público ↗", target: "_blank" }] : []),
