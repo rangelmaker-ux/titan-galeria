@@ -1,7 +1,7 @@
 -- Transactional integration: no customer or payment data survives rollback.
 begin;
 do $$ declare u uuid:=gen_random_uuid(); begin
- insert into auth.users(id,email,email_confirmed_at,raw_user_meta_data) values(u,'trial-'||u||'@example.invalid',now(),'{"display_name":"Teste temporario"}');
+ insert into auth.users(id,email,email_confirmed_at,confirmation_sent_at,raw_user_meta_data) values(u,'trial-'||u||'@example.invalid',now(),now(),'{"display_name":"Teste temporario"}');
  perform set_config('request.jwt.claim.sub',u::text,true);
  perform set_config('titan.fixture_uid',u::text,true);
 end $$;
@@ -51,12 +51,23 @@ reset role;
 do $$ declare u uuid:=gen_random_uuid(); email text; begin
  email:='prepurchase-'||u||'@example.invalid';
  perform public.sync_titan_subscription(jsonb_build_object('subscriptionId','sub_preaccount_fixture','customerId','cus_preaccount_fixture','email',email,'status','active','paidUntil',now()+interval '30 days','interval','mensal','eventCreated',200));
- insert into auth.users(id,email,raw_user_meta_data) values(u,email,'{}');
+ insert into auth.users(id,email,confirmation_sent_at,raw_user_meta_data) values(u,email,now(),'{}');
  if (select paid_until>now() from public.photographers where id=u) then raise exception 'unverified email claimed purchase'; end if;
  update auth.users set email_confirmed_at=now() where id=u;
  if (select paid_until>now() from public.photographers where id=u) is not true then raise exception 'verified signup did not claim purchase'; end if;
  if (select photographer_id from public.billing_entitlements where subscription_id='sub_preaccount_fixture') is distinct from u then raise exception 'purchase matched wrong account'; end if;
  perform set_config('titan.paid_uid',u::text,true);
+end $$;
+-- Autoconfirm alone is not proof that a pending purchaser owns the email.
+do $$ declare u uuid:=gen_random_uuid(); email text; begin
+ email:='autoconfirm-'||u||'@example.invalid';
+ perform public.sync_titan_subscription(jsonb_build_object('subscriptionId','sub_autoconfirm_fixture','customerId','cus_autoconfirm_fixture','email',email,'status','active','paidUntil',now()+interval '30 days','eventCreated',300));
+ insert into auth.users(id,email,email_confirmed_at,raw_user_meta_data) values(u,email,now(),'{}');
+ if (select paid_until>now() from public.photographers where id=u) then raise exception 'automatic confirmation stole pending purchase'; end if;
+ if (select photographer_id from public.billing_entitlements where subscription_id='sub_autoconfirm_fixture') is not null then raise exception 'unverified account claimed pending purchase'; end if;
+ -- An authenticated checkout binds the server-verified user ID AND matching Stripe email.
+ perform public.sync_titan_subscription(jsonb_build_object('subscriptionId','sub_own_checkout_fixture','customerId','cus_own_checkout_fixture','email',email,'accountId',u::text,'status','active','paidUntil',now()+interval '30 days','eventCreated',301));
+ if (select paid_until>now() from public.photographers where id=u) is not true then raise exception 'own authenticated checkout not fulfilled'; end if;
 end $$;
 -- Manual and administrator grants survive trial expiry and Stripe events.
 update public.photographers set manual_plan='titan' where id=current_setting('titan.fixture_uid')::uuid;

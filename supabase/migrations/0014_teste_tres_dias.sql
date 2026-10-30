@@ -48,7 +48,7 @@ declare account_id uuid; saved public.billing_entitlements%rowtype;
 begin
   if nullif(payload->>'email','') is null or nullif(payload->>'subscriptionId','') is null then raise exception 'invalid_billing_event'; end if;
   select p.id into account_id from public.photographers p join auth.users u on u.id=p.id
-    where lower(btrim(u.email))=lower(btrim(payload->>'email')) and u.email_confirmed_at is not null limit 1;
+    where lower(btrim(u.email))=lower(btrim(payload->>'email')) and u.email_confirmed_at is not null and (u.confirmation_sent_at is not null or u.id::text=payload->>'accountId') limit 1;
   insert into public.billing_entitlements(subscription_id,customer_id,email,photographer_id,status,paid_until,billing_interval,event_created)
   values(payload->>'subscriptionId',payload->>'customerId',lower(btrim(payload->>'email')),account_id,payload->>'status',
     nullif(payload->>'paidUntil','')::timestamptz,payload->>'interval',(payload->>'eventCreated')::bigint)
@@ -73,7 +73,7 @@ grant execute on function public.sync_titan_subscription(jsonb) to service_role;
 create or replace function private.claim_titan_purchase()
 returns trigger language plpgsql security definer set search_path='' as $$
 begin
-  if new.email_confirmed_at is null then return new; end if;
+  if new.email_confirmed_at is null or new.confirmation_sent_at is null then return new; end if;
   update public.billing_entitlements set photographer_id=new.id
     where photographer_id is null and email=lower(btrim(new.email));
   perform private.refresh_titan_billing(new.id);
@@ -87,7 +87,7 @@ create or replace function private.claim_own_titan_purchase()
 returns void language plpgsql security definer set search_path='' as $$
 declare account_email text;
 begin
- select lower(btrim(email)) into account_email from auth.users where id=auth.uid() and email_confirmed_at is not null;
+ select lower(btrim(email)) into account_email from auth.users where id=auth.uid() and email_confirmed_at is not null and confirmation_sent_at is not null;
  if account_email is null then return; end if;
  update public.billing_entitlements set photographer_id=auth.uid() where photographer_id is null and email=account_email;
  perform private.refresh_titan_billing(auth.uid());

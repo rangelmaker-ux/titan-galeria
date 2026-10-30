@@ -27,6 +27,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "cadência de cobrança inválida" }, { status: 400 });
   }
 
+  if (!user && process.env.ENABLE_PREACCOUNT_PURCHASES !== "true") {
+    return NextResponse.json({ error: "Para continuar, entre ou crie sua conta com o e-mail que receberá o acesso.", url: "/entrar" }, { status: 401 });
+  }
+
   const planDef = BILLING_OPTIONS[intervalo];
 
   const { data: fotografo } = user ? await supabase.from("photographers")

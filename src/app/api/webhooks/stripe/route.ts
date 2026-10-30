@@ -29,7 +29,7 @@ async function syncSubscription(id: string, eventCreated: number, emailHint?: st
   const periodEnd = subscription.current_period_end;
   const paidUntil = invoicePaid && subscription.status === "active" && periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
   const { error } = await createServiceClient().rpc("sync_titan_subscription", { payload: {
-    subscriptionId: subscription.id, customerId, email,
+    subscriptionId: subscription.id, customerId, email, accountId: subscription.metadata?.photographerId || null,
     status: mapSubscriptionStatus(subscription.status), paidUntil,
     interval: billingIntervalFromStripePriceId(priceId), eventCreated,
   } });
