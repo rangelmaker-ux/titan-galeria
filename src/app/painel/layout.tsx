@@ -1,3 +1,5 @@
+import { AccessWatcher } from "@/components/access-watcher";
+import { accountAccess } from "@/lib/access";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SairButton } from "./sair-button";
@@ -13,7 +15,7 @@ export default async function PainelLayout({ children }: { children: React.React
 
   const { data: fotografo } = await supabase
     .from("photographers")
-    .select("display_name, slug")
+    .select("display_name, slug, plan_source, manual_plan, paid_until, trial_started_at, trial_ends_at")
     .eq("id", user?.id)
     .single();
 
@@ -52,7 +54,7 @@ export default async function PainelLayout({ children }: { children: React.React
           <SairButton />
         </div>
       </aside>
-      <main className="min-w-0 flex-1 p-4 sm:p-6 md:p-8">{children}</main>
+      <main className="min-w-0 flex-1 p-4 sm:p-6 md:p-8">{accountAccess(fotografo) === "trial" && <aside className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><p><strong>Teste gratuito · todas as ferramentas</strong><br/>Termina em {new Date(fotografo!.trial_ends_at!).toLocaleString("pt-BR", {timeZone:"America/Sao_Paulo"})} (Brasília).</p><Link href="/painel/assinatura" className="font-medium underline">Assinar para continuar</Link></aside>}{accountAccess(fotografo) === "trial" && <AccessWatcher expiresAt={fotografo?.trial_ends_at}/ >}{children}</main>
     </div>
   );
 }

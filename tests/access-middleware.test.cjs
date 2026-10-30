@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict');const{test}=require('node:test');const fs=require('node:fs');const vm=require('node:vm');const ts=require('typescript');
+function load(file,mocks={}){const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{module:m,exports:m.exports,require:n=>n in mocks?mocks[n]:require(n),process,URL,Date});return m.exports;}
+const access=load('src/lib/access.ts');
+function setup(profile,user={id:'user'}){const cookies={getAll:()=>[],set(){}};const q={select(){return q},eq(){return q},single:async()=>({data:profile,error:null})};const db={auth:{getUser:async()=>({data:{user}})},from:()=>q};const response={next:()=>({kind:'next',cookies}),redirect:url=>({kind:'redirect',url:url.pathname,cookies}),json:(body,init)=>({kind:'json',body,status:init.status})};const h=load('src/middleware.ts',{'@supabase/ssr':{createServerClient:()=>db},'next/server':{NextResponse:response},'@/lib/access':access});return{run:path=>h.middleware({cookies,nextUrl:{pathname:path,clone:()=>new URL('https://example.test'+path)}})}}
+const expired={trial_started_at:'2020-01-01',trial_ends_at:'2020-01-04'};
+for(const path of ['/painel','/painel/galerias/new','/painel/produtos','/painel/configuracoes'])test(`expired page blocked: ${path}`,async()=>{const r=await setup(expired).run(path);assert.equal(r.kind,'redirect');assert.equal(r.url,'/painel/assinatura')});
+for(const path of ['/api/upload/preview','/api/pedidos/123','/api/drive/connect','/api/produtos'])test(`expired API blocked: ${path}`,async()=>{const r=await setup(expired).run(path);assert.equal(r.status,403)});
+test('welcome page is required before using tools',async()=>{assert.equal((await setup({}).run('/painel')).url,'/painel/teste')});
+test('expired billing remains accessible',async()=>{assert.equal((await setup(expired).run('/painel/assinatura')).kind,'next')});
+test('active trial may use tools',async()=>{assert.equal((await setup({trial_started_at:'2026-01-01',trial_ends_at:'2099-01-04'}).run('/api/upload/preview')).kind,'next')});
+test('administrator may use tools after trial date',async()=>{assert.equal((await setup({...expired,plan_source:'admin'}).run('/api/upload/preview')).kind,'next')});
+test('login is still required for panel',async()=>{assert.equal((await setup(null,null).run('/painel')).url,'/entrar')});
