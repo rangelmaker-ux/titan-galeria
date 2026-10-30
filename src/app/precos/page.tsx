@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BILLING_ORDER, BILLING_OPTIONS, PLANS } from "@/lib/plans";
+import { Logo } from "@/components/logo";
 
 const plano = PLANS.titan;
 
@@ -16,7 +17,7 @@ export default function PrecosPage() {
   return (
     <main className="mx-auto max-w-5xl px-6 py-16">
       <div className="mb-12 text-center">
-        <span className="text-sm uppercase tracking-widest text-neutral-500">Titan Galeria</span>
+        <Logo className="justify-center" />
         <h1 className="mt-2 text-4xl font-semibold">Um plano só, acesso completo</h1>
         <p className="mt-3 text-neutral-600">
           Sem comissão por venda e sem níveis de recurso — você escolhe apenas a cadência de

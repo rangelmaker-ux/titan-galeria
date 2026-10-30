@@ -4,6 +4,10 @@
 
 html {
   color-scheme: light;
+  /* Tira o zoom de toque duplo (double-tap) sem tocar no zoom de pinça
+   * manual — esse sim continua funcionando, pra quem precisar. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
 }
 
 /* Nunca deixa a página rolar pro lado no celular, mesmo se algum elemento
@@ -15,6 +19,19 @@ html, body {
 
 body {
   @apply bg-paper text-ink antialiased;
+}
+
+/* O iOS dá zoom automático ao focar um campo com fonte abaixo de 16px —
+ * isso é a causa real do "zoom ao clicar na caixa de diálogo". Forçando
+ * 16px em todo campo, o zoom automático nunca é disparado. */
+input, select, textarea {
+  font-size: 16px;
+}
+
+/* Nenhum elemento, mesmo um filho "largo demais" (imagem sem max-width,
+ * tabela, etc.), pode forçar rolagem horizontal da página. */
+img, table, pre, video {
+  max-width: 100%;
 }
 
 @keyframes login-photo-crossfade {

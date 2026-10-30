@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SairButton } from "./sair-button";
+import { MobileNav } from "./mobile-nav";
 import { isAdmin } from "@/lib/admin";
+import { LogoMark } from "@/components/logo";
 
 export default async function PainelLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -15,40 +17,35 @@ export default async function PainelLayout({ children }: { children: React.React
     .eq("id", user?.id)
     .single();
 
+  const navItems = [
+    ...(isAdmin(user) ? [{ href: "/painel/admin", label: "Administração · planos" }] : []),
+    { href: "/painel", label: "Galerias" },
+    { href: "/painel/produtos", label: "Produtos" },
+    { href: "/painel/assinatura", label: "Assinatura" },
+    { href: "/painel/ganhos", label: "Meus ganhos" },
+    { href: "/painel/configuracoes", label: "Meu perfil" },
+    ...(fotografo?.slug ? [{ href: `/p/${fotografo.slug}`, label: "Ver portfólio público ↗", target: "_blank" }] : []),
+  ];
+
   return (
-    <div className="flex min-h-screen">
-      <aside className="flex w-56 flex-col justify-between border-r border-neutral-200 p-5">
+    <div className="flex min-h-screen flex-col md:flex-row">
+      {/* No celular a barra lateral não cabe — vira essa barra no topo. */}
+      <MobileNav items={navItems} displayName={fotografo?.display_name} />
+
+      <aside className="hidden w-56 shrink-0 flex-col justify-between border-r border-neutral-200 p-5 md:flex">
         <div>
-          <p className="mb-8 text-sm font-semibold">Titan Galeria</p>
+          <p className="mb-8 flex items-center gap-2 text-sm font-semibold"><LogoMark size={20} />Titan Galeria</p>
           <nav className="flex flex-col gap-1 text-sm">
-            {isAdmin(user) && <Link href="/painel/admin" className="rounded-md bg-neutral-100 px-3 py-2 font-medium">Administração · planos</Link>}
-            <Link href="/painel" className="rounded-md px-3 py-2 hover:bg-neutral-100">
-              Galerias
-            </Link>
-            <Link href="/painel/produtos" className="rounded-md px-3 py-2 hover:bg-neutral-100">
-              Produtos
-            </Link>
-            <Link href="/painel/assinatura" className="rounded-md px-3 py-2 hover:bg-neutral-100">
-              Assinatura
-            </Link>
-            <Link href="/painel/ganhos" className="rounded-md px-3 py-2 hover:bg-neutral-100">
-              Meus ganhos
-            </Link>
-            <Link
-              href="/painel/configuracoes"
-              className="rounded-md px-3 py-2 hover:bg-neutral-100"
-            >
-              Meu perfil
-            </Link>
-            {fotografo?.slug && (
+            {navItems.map((item) => (
               <Link
-                href={`/p/${fotografo.slug}`}
-                target="_blank"
-                className="rounded-md px-3 py-2 text-neutral-500 hover:bg-neutral-100"
+                key={item.href}
+                href={item.href}
+                target={item.target}
+                className={`rounded-md px-3 py-2 hover:bg-neutral-100 ${item.href === "/painel/admin" ? "bg-neutral-100 font-medium" : item.target ? "text-neutral-500" : ""}`}
               >
-                Ver portfólio público ↗
+                {item.label}
               </Link>
-            )}
+            ))}
           </nav>
         </div>
         <div className="text-xs text-neutral-500">
@@ -56,7 +53,7 @@ export default async function PainelLayout({ children }: { children: React.React
           <SairButton />
         </div>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+      <main className="min-w-0 flex-1 p-4 sm:p-6 md:p-8">{children}</main>
     </div>
   );
 }

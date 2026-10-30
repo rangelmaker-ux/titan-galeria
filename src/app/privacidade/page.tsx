@@ -1,9 +1,11 @@
+import { Logo } from "@/components/logo";
+
 export const metadata = { title: "Política de Privacidade — Titan Galeria" };
 
 export default function PrivacidadePage() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
-      <span className="text-sm uppercase tracking-widest text-neutral-500">Titan Galeria</span>
+      <Logo />
       <h1 className="mt-2 text-3xl font-semibold">Política de Privacidade</h1>
       <p className="mt-2 text-sm text-neutral-500">Última atualização: 29 de outubro de 2026</p>
 

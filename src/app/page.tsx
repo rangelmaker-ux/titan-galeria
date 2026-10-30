@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { HeroSlider } from "./hero-slider";
+import { Logo } from "@/components/logo";
 
 const RECURSOS = [
   {
@@ -21,9 +22,7 @@ export default function LandingPage() {
     <main className="mx-auto max-w-6xl px-6 py-16">
       <div className="grid items-center gap-12 lg:grid-cols-2">
         <div className="flex flex-col items-start gap-6 text-left">
-          <span className="text-sm uppercase tracking-widest text-neutral-500">
-            Titan Galeria
-          </span>
+          <Logo />
           <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
             Entregue, encante e venda.
             <br />
