@@ -42,3 +42,10 @@ img, table, pre, video {
 @media (prefers-reduced-motion: reduce) {
   .login-photo-crossfade { animation: none; opacity: 0; }
 }
+
+html { scroll-behavior: smooth; }
+.gallery-cover-photo { animation: gallery-cover-reveal 1.8s ease-out both; }
+.gallery-cover-text { animation: gallery-cover-text 1.2s .25s ease-out both; }
+@keyframes gallery-cover-reveal { from { transform: scale(1.045); filter: blur(3px); } to { transform: scale(1); filter: blur(0); } }
+@keyframes gallery-cover-text { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .gallery-cover-photo, .gallery-cover-text { animation: none; } }
