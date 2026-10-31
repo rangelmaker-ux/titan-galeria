@@ -36,7 +36,7 @@ export function WelcomeIntro({ title, body, font, onDone }: { title: string; bod
           onClick={ver}
           className="mt-10 inline-block border border-white/80 px-10 py-3 text-xs uppercase tracking-[0.2em] transition hover:bg-white hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4"
         >
-          Ver
+          Ver galeria
         </button>
       </div>
     </main>

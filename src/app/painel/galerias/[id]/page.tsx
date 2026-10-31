@@ -130,7 +130,7 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
       </section>
 
       {favoritosPorCliente.size > 0 && (
-        <section className="rounded-xl border border-neutral-200 bg-white p-5">
+        <section id="selecoes" className="rounded-xl border border-neutral-200 bg-white p-5">
           <h2 className="font-semibold">Fotos escolhidas pelos clientes</h2>
           <p className="mt-2 text-sm text-neutral-600">
             Toque no coraçãozinho na galeria pública marca estas fotos. Se não houver preço por
@@ -152,7 +152,7 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
         </section>
       )}
 
-      <section>
+      <section id="pedidos">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
           Pedidos
         </h2>

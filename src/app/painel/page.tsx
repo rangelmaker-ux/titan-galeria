@@ -11,7 +11,7 @@ export default async function PainelGaleriasPage() {
 
   const { data: galerias } = await supabase
     .from("galleries")
-    .select("id, title, slug, client_name, is_published, share_token, watermark_previews, created_at")
+    .select("id, title, slug, client_name, is_published, share_token, watermark_previews, allow_downloads, created_at")
     .eq("photographer_id", user?.id)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
@@ -93,7 +93,13 @@ export default async function PainelGaleriasPage() {
                   {g.is_published ? "Publicada no portfólio" : "Só por link"}
                 </span>
               </div>
-              <GalleryCardMenu galleryId={g.id} watermarkPreviews={g.watermark_previews} />
+              <Link
+                href={`/painel/galerias/${g.id}`}
+                className="relative z-10 shrink-0 self-start rounded-lg border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100"
+              >
+                Editar
+              </Link>
+              <GalleryCardMenu galleryId={g.id} watermarkPreviews={g.watermark_previews} allowDownloads={g.allow_downloads} />
             </div>
           );
         })}
