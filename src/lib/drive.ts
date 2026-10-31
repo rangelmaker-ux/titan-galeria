@@ -186,3 +186,37 @@ export async function deleteDriveFile(account: DriveAccount, fileId: string) {
 export async function deleteDriveFolder(account: DriveAccount, folderId: string) {
   await deleteDriveFile(account, folderId);
 }
+
+/** Compartilha um arquivo/pasta (com `account`, dono de verdade) com o
+ * e-mail de outra conta Google. Permissão numa PASTA é herdada por tudo que
+ * está dentro dela — então compartilhar a pasta da galeria já dá acesso a
+ * cada arquivo individual, sem precisar compartilhar um por um. Usado pra
+ * corrigir galerias que foram enviadas pro Drive do administrador antes do
+ * fotógrafo ter conectado o próprio Drive (ver /api/admin/migrar-drive). */
+export async function shareDriveItem(account: DriveAccount, fileId: string, email: string, role: "reader" | "writer" = "writer") {
+  const token = await getAccessToken(account.refreshToken);
+  const res = await fetch(`${DRIVE_API}/files/${fileId}/permissions?sendNotificationEmail=false`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ role, type: "user", emailAddress: email }),
+  });
+  if (!res.ok) throw new Error("falha ao compartilhar no Drive: " + (await res.text()));
+}
+
+/** Copia um arquivo (que precisa já estar compartilhado com `account`, ver
+ * shareDriveItem) pra DENTRO do Drive de `account` — a cópia nasce como
+ * arquivo próprio dele, contando no espaço da conta dele, não mais na de
+ * quem compartilhou. É o jeito oficial do Drive de "mover" um arquivo entre
+ * duas contas pessoais do Google (não existe transferência de posse direta
+ * fora de contas Workspace do mesmo domínio). */
+export async function copyDriveFileInto(account: DriveAccount, fileId: string, destFolderId: string, name?: string): Promise<string> {
+  const token = await getAccessToken(account.refreshToken);
+  const res = await fetch(`${DRIVE_API}/files/${fileId}/copy?fields=id`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ parents: [destFolderId], ...(name ? { name } : {}) }),
+  });
+  if (!res.ok) throw new Error("falha ao copiar arquivo no Drive: " + (await res.text()));
+  const data = await res.json();
+  return data.id as string;
+}
