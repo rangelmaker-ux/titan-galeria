@@ -98,12 +98,12 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
           } : (fotografo?.display_name ?? "Titan Galeria")) : null}
           plano={fotografo?.plan ?? "gratuito"}
         />
-        <ShareLink shareToken={galeria.share_token} />
+        <ShareLink shareToken={galeria.share_token} clientName={galeria.client_name} />
       </section>
 
       <MediaGrid galleryId={galeria.id} midias={midiasComUrl} />
 
-      <CoverForm galleryId={galeria.id} title={galeria.title} photographer={fotografo?.display_name || ""} initial={galeria.delivery_design} photos={midiasComUrl.filter((m) => m.type === "photo")} />
+      <CoverForm galleryId={galeria.id} title={galeria.title} photographer={fotografo?.display_name || ""} initial={galeria.delivery_design} welcomeInitial={galeria.welcome_message} photos={midiasComUrl.filter((m) => m.type === "photo")} />
 
       <GallerySettingsForm galeria={galeria} previewPhotos={midiasComUrl.filter((m) => m.type === "photo").slice(0, 8).map((m) => m.previewUrl)} />
 

@@ -7,6 +7,7 @@ import { LAYOUT_GRID, LAYOUT_ITEM, type GalleryTemplate } from "@/lib/gallery-la
 type Galeria = {
   id: string; is_published: boolean; allow_favorites: boolean; allow_downloads: boolean;
   watermark_previews: boolean; password_hash: string | null; template: GalleryTemplate; realtime_mode: boolean;
+  require_client_name: boolean;
 };
 const TEMPLATES: { value: GalleryTemplate; label: string; descricao: string }[] = [
   { value: "grid", label: "Grade", descricao: "Fotos em quadrados do mesmo tamanho." },
@@ -38,7 +39,7 @@ export function GallerySettingsForm({ galeria, previewPhotos = [] }: { galeria: 
       const res = await fetch(`/api/galerias/${galeria.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(campo) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Não foi possível salvar as configurações.");
-      const keys: Record<string, keyof Galeria> = { template: "template", isPublished: "is_published", allowFavorites: "allow_favorites", allowDownloads: "allow_downloads", watermarkPreviews: "watermark_previews", realtimeMode: "realtime_mode" };
+      const keys: Record<string, keyof Galeria> = { template: "template", isPublished: "is_published", allowFavorites: "allow_favorites", allowDownloads: "allow_downloads", watermarkPreviews: "watermark_previews", realtimeMode: "realtime_mode", requireClientName: "require_client_name" };
       setSettings((previous) => {
         const next = { ...previous };
         for (const [key, value] of Object.entries(campo)) if (keys[key]) Object.assign(next, { [keys[key]]: value });
@@ -88,6 +89,8 @@ export function GallerySettingsForm({ galeria, previewPhotos = [] }: { galeria: 
       <div className="mt-2 space-y-4 border-t border-neutral-200 pt-5">
         <Toggle label="Publicar no portfólio público" checked={settings.is_published} disabled={salvando} onChange={(v) => void atualizar({ isPublished: v })} />
         <Toggle label="Evento em tempo real (fotos aparecem ao vivo pro cliente, sem precisar recarregar a página)" checked={settings.realtime_mode} disabled={salvando} onChange={(v) => void atualizar({ realtimeMode: v })} />
+        <Toggle label="Pedir nome e sobrenome do cliente antes de mostrar as fotos" checked={settings.require_client_name} disabled={salvando} onChange={(v) => void atualizar({ requireClientName: v })} />
+        <p className="-mt-2 pl-0 text-xs text-neutral-500">Desative para entregas gratuitas sem venda: o cliente entra direto nas fotos, sem precisar se identificar.</p>
         <Toggle label="Cliente pode favoritar/aprovar fotos" checked={settings.allow_favorites} disabled={salvando} onChange={(v) => void atualizar({ allowFavorites: v })} />
         <Toggle label="Permitir download gratuito (sem cobrar nada)" checked={settings.allow_downloads} disabled={salvando} onChange={(v) => void atualizar({ allowDownloads: v })} />
         <p className="-mt-2 pl-0 text-xs text-neutral-500">Desativado = cobrado. Defina os preços (por foto ou pacote completo) na seção &quot;Cobrança de downloads&quot; abaixo.</p>
