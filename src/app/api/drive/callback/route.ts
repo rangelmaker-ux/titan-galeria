@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     const service = createServiceClient();
-    await service
+    const { error: updateError } = await service
       .from("photographers")
       .update({
         drive_refresh_token: refreshToken,
@@ -63,6 +63,16 @@ export async function GET(req: NextRequest) {
         drive_connected_at: new Date().toISOString(),
       })
       .eq("id", user.id);
+
+    // Se o UPDATE falhar (ex: colunas drive_* não existem ainda porque a
+    // migration 0009 não foi aplicada), NÃO pode redirecionar como sucesso —
+    // senão o fotógrafo acha que conectou o próprio Drive, mas nada foi
+    // salvo, e os próximos envios continuam caindo silenciosamente na conta
+    // do administrador.
+    if (updateError) {
+      console.error("[drive/callback] falha ao salvar credenciais do Drive", user.id, updateError.message);
+      return NextResponse.redirect(new URL("/painel/configuracoes?drive=erro_salvar", req.url));
+    }
 
     return NextResponse.redirect(new URL("/painel/configuracoes?drive=conectado", req.url));
   } catch {
