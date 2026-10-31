@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ZipArchive } from "archiver";
 import { Readable } from "node:stream";
 import { createServiceClient } from "@/lib/supabase/server";
-import { extractShareToken } from "@/lib/share-link";
+import { shareTokenCandidates } from "@/lib/share-link";
 import { resolveGalleryDownload, type DownloadableMedia } from "@/lib/gallery-download";
 
 export const dynamic = "force-dynamic";
@@ -14,13 +14,12 @@ export const maxDuration = 300; // galerias grandes em .zip podem demorar
  * está disponível. Segue a mesma regra de marca d'água do download de
  * pedidos pagos: ver src/lib/gallery-download.ts. */
 export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
-  const token = extractShareToken(params.token);
   const db = createServiceClient();
 
   const { data: galeria } = await db
     .from("galleries")
     .select("id, photographer_id, allow_downloads, watermark_previews")
-    .eq("share_token", token)
+    .in("share_token", shareTokenCandidates(params.token))
     .is("deleted_at", null)
     .single();
   if (!galeria) return NextResponse.json({ error: "galeria não encontrada" }, { status: 404 });

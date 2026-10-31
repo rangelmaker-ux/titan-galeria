@@ -5,7 +5,7 @@ import { publicPreviewUrl } from "@/lib/r2";
 import { PasswordGate } from "@/components/public/password-gate";
 import { ClientGalleryView } from "@/components/public/client-gallery-view";
 import { getPlan } from "@/lib/plans";
-import { extractShareToken } from "@/lib/share-link";
+import { shareTokenCandidates } from "@/lib/share-link";
 
 // Sem isso, o fetch da galeria (via supabase-js) podia ficar em cache e a
 // página pública continuava mostrando dados antigos (senha removida, modo
@@ -22,18 +22,19 @@ export default async function GaleriaPublicaPage({
 }) {
   const supabase = createServiceClient();
   // A URL pública pode trazer o nome do cliente no final (ver src/lib/share-link.ts)
-  // — o token de verdade é sempre os primeiros 16 caracteres do parâmetro.
-  const token = extractShareToken(params.token);
-
+  // e o token real pode ter um de três tamanhos diferentes, dependendo de
+  // quando a galeria foi criada — por isso resolve contra o banco em vez de
+  // adivinhar um tamanho fixo, e usa o valor que bateu (nunca o palpite).
   const { data: galeria } = await supabase
     .from("galleries")
     .select(
-      "id, title, client_name, password_hash, allow_favorites, allow_downloads, photographer_id, template, realtime_mode, is_published, delivery_design, welcome_message, require_client_name"
+      "id, title, client_name, password_hash, allow_favorites, allow_downloads, photographer_id, template, realtime_mode, is_published, delivery_design, welcome_message, require_client_name, share_token"
     )
-    .eq("share_token", token)
+    .in("share_token", shareTokenCandidates(params.token))
     .is("deleted_at", null)
     .single();
   if (!galeria) notFound();
+  const token = galeria.share_token;
 
   const cookieStore = cookies();
   const desbloqueada = !galeria.password_hash || cookieStore.get(`g_${token}_ok`)?.value === "1";
