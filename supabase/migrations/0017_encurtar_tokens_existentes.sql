@@ -7,5 +7,5 @@
 -- então o fotógrafo não precisa fazer nada — só precisa reenviar o link pro
 -- cliente se já tinha enviado antes.
 update public.galleries
-set share_token = encode(gen_random_bytes(8), 'base64url')
+set share_token = rtrim(replace(replace(encode(gen_random_bytes(8), 'base64'), '+', '-'), '/', '_'), '=')
 where deleted_at is null;

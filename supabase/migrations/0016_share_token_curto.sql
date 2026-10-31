@@ -10,5 +10,10 @@
 -- links que já foram compartilhados continuam funcionando normalmente. Ver
 -- src/lib/share-link.ts (shareTokenCandidates) pra como o código lida com os
 -- três formatos possíveis na hora de resolver um link.
+--
+-- Postgres não tem o encoding 'base64url' em encode() (só 'base64'/'hex'/
+-- 'escape' — a migration 0005 já teve que corrigir esse mesmo engano antes),
+-- então gera em base64 normal e troca os caracteres não url-safe (+ / =)
+-- igual o base64url faria.
 alter table public.galleries
-  alter column share_token set default encode(gen_random_bytes(8), 'base64url');
+  alter column share_token set default rtrim(replace(replace(encode(gen_random_bytes(8), 'base64'), '+', '-'), '/', '_'), '=');
