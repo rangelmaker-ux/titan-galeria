@@ -7,6 +7,7 @@ const MENSAGEM_STATUS: Record<string, { tipo: "ok" | "erro"; texto: string }> = 
   conectado: { tipo: "ok", texto: "Google Drive conectado! Os próximos uploads vão direto pra sua própria conta." },
   cancelado: { tipo: "erro", texto: "Conexão cancelada — nada foi alterado." },
   erro: { tipo: "erro", texto: "Não foi possível conectar o Drive. Tente novamente." },
+  erro_salvar: { tipo: "erro", texto: "O Google autorizou, mas não conseguimos salvar a conexão no banco. Seus uploads ainda vão pra conta padrão da plataforma — fale com o suporte antes de tentar de novo." },
   sem_refresh_token: { tipo: "erro", texto: "O Google não devolveu a autorização completa. Acesse myaccount.google.com → Segurança → Apps conectados, remova o acesso da Titan Galeria e tente conectar de novo." },
 };
 

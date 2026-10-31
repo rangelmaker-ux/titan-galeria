@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import QRCode from "qrcode";
 import { createServiceClient } from "@/lib/supabase/server";
 import { canReadOrder, whatsappLink } from "@/lib/order-access";
+import { buildPixPayload } from "@/lib/pix";
 export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest, { params }: { params: { orderId: string } }) {
   const db = createServiceClient();
@@ -10,8 +12,32 @@ export async function GET(req: NextRequest, { params }: { params: { orderId: str
   if (order.payment_method === "manual_pix") {
     const { data: items, error } = await db.from("order_items").select("media_id, product_name, product_type").eq("order_id", order.id);
     if (error) return NextResponse.json({ error: "Não foi possível consultar os arquivos do pedido." }, { status: 500 });
+
+    // Nome e foto de quem recebe o Pix, pra exibir no checkout junto com a
+    // chave e o QR Code — reaproveita o mesmo perfil público do fotógrafo.
+    const { data: galeria } = await db.from("galleries").select("photographer_id").eq("id", order.gallery_id).single();
+    const { data: fotografo } = galeria
+      ? await db.from("photographers").select("display_name, avatar_url").eq("id", galeria.photographer_id).single()
+      : { data: null };
+
+    let pixPayload: string | null = null;
+    let pixQrDataUrl: string | null = null;
+    if (order.pix_key_snapshot && order.total_cents > 0) {
+      try {
+        pixPayload = buildPixPayload({
+          pixKey: order.pix_key_snapshot,
+          merchantName: fotografo?.display_name || "Titan Galeria",
+          amountCents: order.total_cents,
+          txid: order.id,
+        });
+        pixQrDataUrl = await QRCode.toDataURL(pixPayload, { margin: 1, width: 320 });
+      } catch { /* QR é só um extra visual — a chave em texto já basta pra pagar */ }
+    }
+
     return NextResponse.json({ status: order.status, totalCents: order.total_cents, clientName: order.client_identifier,
-      pixKey: order.pix_key_snapshot, whatsappUrl: whatsappLink(order.whatsapp_snapshot || "", `Olá! Sou ${order.client_identifier}. Pedido ${order.id}. Vou enviar o comprovante do Pix para conferência e liberação.`),
+      pixKey: order.pix_key_snapshot, pixPayload, pixQrDataUrl,
+      merchantName: fotografo?.display_name || null, merchantAvatarUrl: fotografo?.avatar_url || null,
+      whatsappUrl: whatsappLink(order.whatsapp_snapshot || "", `Olá! Sou ${order.client_identifier}. Pedido ${order.id}. Vou enviar o comprovante do Pix para conferência e liberação.`),
       items: items || [], links: order.status === "paid" || order.status === "fulfilled" ? (items || []).filter((i) => i.media_id && i.product_type !== "print").map((i) => ({ mediaId: i.media_id, url: `/api/downloads/${order.id}/arquivo/${i.media_id}` })) : [],
     });
   }

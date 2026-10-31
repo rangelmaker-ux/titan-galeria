@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { buildShareUrl } from "@/lib/share-link";
 
-export function ShareLink({ shareToken }: { shareToken: string }) {
+export function ShareLink({ shareToken, clientName }: { shareToken: string; clientName?: string | null }) {
   const [copiado, setCopiado] = useState(false);
   const url =
-    typeof window !== "undefined" ? `${window.location.origin}/g/${shareToken}` : `/g/${shareToken}`;
+    typeof window !== "undefined"
+      ? buildShareUrl(window.location.origin, shareToken, clientName)
+      : buildShareUrl("", shareToken, clientName);
 
   return (
     <button
