@@ -7,7 +7,7 @@ import { LAYOUT_GRID, LAYOUT_ITEM, type GalleryTemplate } from "@/lib/gallery-la
 type Galeria = {
   id: string; is_published: boolean; allow_favorites: boolean; allow_downloads: boolean;
   watermark_previews: boolean; password_hash: string | null; template: GalleryTemplate; realtime_mode: boolean;
-  require_client_name: boolean;
+  require_client_name: boolean; show_brand_name?: boolean;
 };
 const TEMPLATES: { value: GalleryTemplate; label: string; descricao: string }[] = [
   { value: "grid", label: "Grade", descricao: "Fotos em quadrados do mesmo tamanho." },
@@ -39,7 +39,7 @@ export function GallerySettingsForm({ galeria, previewPhotos = [] }: { galeria: 
       const res = await fetch(`/api/galerias/${galeria.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(campo) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Não foi possível salvar as configurações.");
-      const keys: Record<string, keyof Galeria> = { template: "template", isPublished: "is_published", allowFavorites: "allow_favorites", allowDownloads: "allow_downloads", watermarkPreviews: "watermark_previews", realtimeMode: "realtime_mode", requireClientName: "require_client_name" };
+      const keys: Record<string, keyof Galeria> = { template: "template", isPublished: "is_published", allowFavorites: "allow_favorites", allowDownloads: "allow_downloads", watermarkPreviews: "watermark_previews", realtimeMode: "realtime_mode", requireClientName: "require_client_name", showBrandName: "show_brand_name" };
       setSettings((previous) => {
         const next = { ...previous };
         for (const [key, value] of Object.entries(campo)) if (keys[key]) Object.assign(next, { [keys[key]]: value });
@@ -94,7 +94,9 @@ export function GallerySettingsForm({ galeria, previewPhotos = [] }: { galeria: 
         <Toggle label="Cliente pode favoritar/aprovar fotos" checked={settings.allow_favorites} disabled={salvando} onChange={(v) => void atualizar({ allowFavorites: v })} />
         <Toggle label="Permitir download gratuito (sem cobrar nada)" checked={settings.allow_downloads} disabled={salvando} onChange={(v) => void atualizar({ allowDownloads: v })} />
         <p className="-mt-2 pl-0 text-xs text-neutral-500">Desativado = cobrado. Defina os preços (por foto ou pacote completo) na seção &quot;Cobrança de downloads&quot; abaixo.</p>
-        <Toggle label={settings.allow_downloads ? "Mostrar o nome da minha empresa nas fotos (só na tela, não vai no arquivo baixado)" : "Marca d'água nas prévias"} checked={settings.watermark_previews} disabled={salvando} onChange={(v) => void atualizar({ watermarkPreviews: v })} />
+        {settings.allow_downloads
+          ? <Toggle label="Mostrar o nome da minha empresa nas fotos (só na tela, não vai no arquivo baixado)" checked={!!settings.show_brand_name} disabled={salvando} onChange={(v) => void atualizar({ showBrandName: v })} />
+          : <Toggle label="Marca d'água nas prévias" checked={settings.watermark_previews} disabled={salvando} onChange={(v) => void atualizar({ watermarkPreviews: v })} />}
         <p className="-mt-2 pl-0 text-xs text-neutral-500">Configure sua logo e a posição dela em <a href="/painel/configuracoes" className="underline">Meu perfil</a>.</p>
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-2">

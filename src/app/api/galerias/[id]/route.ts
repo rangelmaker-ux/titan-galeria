@@ -24,6 +24,7 @@ const bodySchema = z.object({
   allowFavorites: z.boolean().optional(),
   allowDownloads: z.boolean().optional(),
   watermarkPreviews: z.boolean().optional(),
+  showBrandName: z.boolean().optional(),
   requireClientName: z.boolean().optional(),
   password: z.string().nullable().optional(), // null/"" remove a senha
   template: z.enum(["grid", "masonry", "minimal"]).optional(),
@@ -44,6 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     allowFavorites,
     allowDownloads,
     watermarkPreviews,
+    showBrandName,
     requireClientName,
     password,
     template,
@@ -65,6 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (allowFavorites !== undefined) update.allow_favorites = allowFavorites;
   if (allowDownloads !== undefined) update.allow_downloads = allowDownloads;
   if (watermarkPreviews !== undefined) update.watermark_previews = watermarkPreviews;
+  if (showBrandName !== undefined) update.show_brand_name = showBrandName;
   if (requireClientName !== undefined) update.require_client_name = requireClientName;
   if (template !== undefined) update.template = template;
   if (realtimeMode !== undefined) update.realtime_mode = realtimeMode;
