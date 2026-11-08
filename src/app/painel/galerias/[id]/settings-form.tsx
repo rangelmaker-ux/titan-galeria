@@ -94,7 +94,7 @@ export function GallerySettingsForm({ galeria, previewPhotos = [] }: { galeria: 
         <Toggle label="Cliente pode favoritar/aprovar fotos" checked={settings.allow_favorites} disabled={salvando} onChange={(v) => void atualizar({ allowFavorites: v })} />
         <Toggle label="Permitir download gratuito (sem cobrar nada)" checked={settings.allow_downloads} disabled={salvando} onChange={(v) => void atualizar({ allowDownloads: v })} />
         <p className="-mt-2 pl-0 text-xs text-neutral-500">Desativado = cobrado. Defina os preços (por foto ou pacote completo) na seção &quot;Cobrança de downloads&quot; abaixo.</p>
-        <Toggle label="Marca d'água nas prévias" checked={settings.watermark_previews} disabled={salvando} onChange={(v) => void atualizar({ watermarkPreviews: v })} />
+        <Toggle label={settings.allow_downloads ? "Mostrar o nome da minha empresa nas fotos (só na tela, não vai no arquivo baixado)" : "Marca d'água nas prévias"} checked={settings.watermark_previews} disabled={salvando} onChange={(v) => void atualizar({ watermarkPreviews: v })} />
         <p className="-mt-2 pl-0 text-xs text-neutral-500">Configure sua logo e a posição dela em <a href="/painel/configuracoes" className="underline">Meu perfil</a>.</p>
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-2">

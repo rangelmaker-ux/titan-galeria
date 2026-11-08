@@ -28,7 +28,7 @@ export default async function GaleriaPublicaPage({
   const { data: galeria } = await supabase
     .from("galleries")
     .select(
-      "id, title, client_name, password_hash, allow_favorites, allow_downloads, photographer_id, template, realtime_mode, is_published, delivery_design, welcome_message, require_client_name, share_token"
+      "id, title, client_name, password_hash, allow_favorites, allow_downloads, photographer_id, template, realtime_mode, is_published, delivery_design, welcome_message, require_client_name, share_token, watermark_previews"
     )
     .in("share_token", shareTokenCandidates(params.token))
     .is("deleted_at", null)
@@ -89,6 +89,7 @@ export default async function GaleriaPublicaPage({
       cover={galeria.delivery_design}
       welcomeMessage={galeria.welcome_message}
       requireClientName={galeria.require_client_name}
+      marcaEmpresa={galeria.watermark_previews}
       photographerName={fotografo?.display_name || ""}
       shareToken={token}
       title={galeria.title}
