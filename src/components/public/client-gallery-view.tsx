@@ -130,9 +130,9 @@ export function ClientGalleryView({ cover, welcomeMessage: welcomeMessageRaw, re
   // Entrega gratuita: sem marca d'água. As prévias antigas podem ter a marca
   // gravada no arquivo, então a galeria exibe o original (mesma rota do download).
   const semMarca = allowDownloads && !isPortfolio;
-  const fotoUrl = (m: Midia) => (semMarca && m.type === "photo" ? `/api/g/${shareToken}/download?mediaId=${m.id}&inline=1` : m.previewUrl);
+  const fotoUrl = (m: Midia, w = 1600) => (semMarca && m.type === "photo" ? `/api/g/${shareToken}/download?mediaId=${m.id}&inline=1&w=${w}` : m.previewUrl);
   const coverPhoto = midias.find((m) => m.id === cover?.mediaId && m.type === "photo") || midias.find((m) => m.type === "photo");
-  const hero = <GalleryCover design={cover} imageUrl={coverPhoto ? fotoUrl(coverPhoto) : undefined}title={title} photographer={photographerName} />;
+  const hero = <GalleryCover design={cover} imageUrl={coverPhoto ? fotoUrl(coverPhoto, 2400) : undefined} fallbackUrl={coverPhoto?.previewUrl}title={title} photographer={photographerName} />;
 
   // ─── Boas-vindas animada: aparece antes de tudo, inclusive da capa ───
   if (temBoasVindas && !introVista) {

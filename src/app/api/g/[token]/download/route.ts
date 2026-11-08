@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZipArchive } from "archiver";
 import { Readable } from "node:stream";
+import sharp from "sharp";
 import { createServiceClient } from "@/lib/supabase/server";
 import { shareTokenCandidates } from "@/lib/share-link";
 import { resolveGalleryDownload, type DownloadableMedia } from "@/lib/gallery-download";
@@ -46,13 +47,22 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     // Entrega gratuita nunca tem marca d'água: sempre o original.
     const resolvido = await resolveGalleryDownload(midia, false, galeria.photographer_id);
     if (!resolvido) return NextResponse.json({ error: "arquivo indisponível" }, { status: 404 });
-    if ("url" in resolvido) return NextResponse.redirect(resolvido.url);
     const inline = url.searchParams.get("inline") === "1";
+    if (inline) {
+      // Exibição na tela: versão redimensionada do ORIGINAL (sem marca d'água,
+      // mesmo que a prévia antiga tenha a marca gravada). Cacheada na CDN.
+      const bruto = "url" in resolvido ? await (await fetch(resolvido.url)).arrayBuffer() : await new Response(resolvido.stream).arrayBuffer();
+      const w = Math.min(3200, Math.max(200, Number(url.searchParams.get("w")) || 1600));
+      const out = await sharp(Buffer.from(bruto)).rotate().resize({ width: w, height: w, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+      return new NextResponse(new Uint8Array(out), {
+        headers: { "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=86400, s-maxage=604800" },
+      });
+    }
+    if ("url" in resolvido) return NextResponse.redirect(resolvido.url);
     return new NextResponse(resolvido.stream, {
       headers: {
         "Content-Type": resolvido.mimeType,
-        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${resolvido.fileName.replace(/"/g, "")}"`,
-        ...(inline ? { "Cache-Control": "private, max-age=3600" } : {}),
+        "Content-Disposition": `attachment; filename="${resolvido.fileName.replace(/"/g, "")}"`,
         ...(resolvido.size ? { "Content-Length": resolvido.size } : {}),
       },
     });
