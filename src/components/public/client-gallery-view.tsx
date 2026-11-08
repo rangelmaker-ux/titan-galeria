@@ -84,6 +84,19 @@ export function ClientGalleryView({ cover, welcomeMessage: welcomeMessageRaw, re
     const overflow = document.body.style.overflow; document.body.style.overflow = "hidden";
     return () => { document.removeEventListener("keydown", tecla); document.body.style.overflow = overflow; };
   }, [aberta, midias]);
+  // Pré-carrega as vizinhas da foto aberta pra troca ser instantânea.
+  useEffect(() => {
+    if (!aberta) return;
+    const fotos = midias.filter((m) => m.type === "photo");
+    const i = fotos.findIndex((m) => m.id === aberta);
+    if (i < 0) return;
+    const livre = allowDownloads && !isPortfolio;
+    for (const d of [1, 2, -1]) {
+      const m = fotos[(i + d + fotos.length) % fotos.length];
+      const img = new Image();
+      img.src = livre ? `/api/g/${shareToken}/download?mediaId=${m.id}&inline=1&w=1600` : m.previewUrl;
+    }
+  }, [aberta, midias, allowDownloads, isPortfolio, shareToken]);
   const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState(initialOrderId || ""); const [order, setOrder] = useState<Order | null>(null);
   const [history, setHistory] = useState<string[]>([]); const [copied, setCopied] = useState(false); const [copiedPayload, setCopiedPayload] = useState(false);
@@ -163,7 +176,7 @@ export function ClientGalleryView({ cover, welcomeMessage: welcomeMessageRaw, re
   const favLb = atualLb ? (isPortfolio ? liked.has(atualLb.id) : favorites.has(atualLb.id)) : false;
   const btnLb = "flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-xl text-white hover:bg-white/20";
   const lightbox = atualLb && <div role="dialog" aria-modal="true" aria-label={`Foto ${idxLb + 1} de ${fotosLb.length}`} className="fixed inset-0 z-50 flex items-center justify-center bg-black/95" onClick={() => setAberta(null)}>
-    <img key={atualLb.id} src={fotoUrl(atualLb, 2400)} onError={(e) => { const el = e.currentTarget; if (el.getAttribute("src") !== atualLb.previewUrl) el.src = atualLb.previewUrl; }} alt={`Foto ${idxLb + 1}`} onClick={(e) => e.stopPropagation()} className="max-h-[100svh] max-w-full object-contain" />
+    <img key={atualLb.id} src={fotoUrl(atualLb)} onError={(e) => { const el = e.currentTarget; if (el.getAttribute("src") !== atualLb.previewUrl) el.src = atualLb.previewUrl; }} alt={`Foto ${idxLb + 1}`} decoding="async" onClick={(e) => e.stopPropagation()} className="max-h-[100svh] max-w-full object-contain" />
     <div className="absolute right-3 top-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
       {(isPortfolio ? allowFavorites : allowFavorites) && <button aria-label={favLb ? "Remover dos favoritos" : "Favoritar"} onClick={() => void (isPortfolio ? like(atualLb.id) : favorite(atualLb.id))} className={btnLb}>{favLb ? "♥" : "♡"}</button>}
       {allowDownloads && !isPortfolio && <a href={`/api/g/${shareToken}/download?mediaId=${atualLb.id}`} onClick={() => iniciarDownload(atualLb.id)} aria-label="Baixar foto" className={btnLb}>{iconeBaixar(atualLb.id, 20)}</a>}
