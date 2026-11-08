@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Midia = {
@@ -12,6 +13,14 @@ type Midia = {
 
 export function MediaGrid({ galleryId, midias }: { galleryId: string; midias: Midia[] }) {
   const router = useRouter();
+  // Minimizar esconde as fotos pra chegar nas configurações sem rolar tudo.
+  // A escolha fica lembrada neste navegador, por galeria.
+  const chave = `titan_fotos_minimizadas_${galleryId}`;
+  const [minimizada, setMinimizada] = useState(false);
+  useEffect(() => { try { setMinimizada(localStorage.getItem(chave) === "1"); } catch { /* sem storage */ } }, [chave]);
+  function alternar() {
+    setMinimizada((v) => { try { localStorage.setItem(chave, v ? "0" : "1"); } catch { /* sem storage */ } return !v; });
+  }
 
   async function excluir(mediaId: string) {
     if (!confirm("Excluir esse arquivo da galeria?")) return;
@@ -28,7 +37,14 @@ export function MediaGrid({ galleryId, midias }: { galleryId: string; midias: Mi
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+    <div>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-sm font-medium">{midias.length} {midias.length === 1 ? "arquivo" : "arquivos"} na galeria</p>
+        <button type="button" onClick={alternar} aria-expanded={!minimizada} className="rounded-full border border-neutral-300 px-4 py-1.5 text-sm hover:bg-neutral-100">
+          {minimizada ? "Mostrar fotos ▾" : "Minimizar fotos ▴"}
+        </button>
+      </div>
+      {!minimizada && <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
       {midias.map((m) => (
         <div key={m.id} className="group relative aspect-square overflow-hidden rounded-lg bg-neutral-100">
           {m.type === "photo" ? (
@@ -45,6 +61,7 @@ export function MediaGrid({ galleryId, midias }: { galleryId: string; midias: Mi
           </button>
         </div>
       ))}
+      </div>}
     </div>
   );
 }
