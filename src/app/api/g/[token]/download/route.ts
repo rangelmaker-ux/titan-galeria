@@ -43,13 +43,16 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
   if (!midia) return NextResponse.json({ error: "arquivo não encontrado" }, { status: 404 });
 
   try {
-    const resolvido = await resolveGalleryDownload(midia, galeria.watermark_previews, galeria.photographer_id);
+    // Entrega gratuita nunca tem marca d'água: sempre o original.
+    const resolvido = await resolveGalleryDownload(midia, false, galeria.photographer_id);
     if (!resolvido) return NextResponse.json({ error: "arquivo indisponível" }, { status: 404 });
     if ("url" in resolvido) return NextResponse.redirect(resolvido.url);
+    const inline = url.searchParams.get("inline") === "1";
     return new NextResponse(resolvido.stream, {
       headers: {
         "Content-Type": resolvido.mimeType,
-        "Content-Disposition": `attachment; filename="${resolvido.fileName.replace(/"/g, "")}"`,
+        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${resolvido.fileName.replace(/"/g, "")}"`,
+        ...(inline ? { "Cache-Control": "private, max-age=3600" } : {}),
         ...(resolvido.size ? { "Content-Length": resolvido.size } : {}),
       },
     });
@@ -81,7 +84,7 @@ async function streamZip(
     for (const midia of midias as DownloadableMedia[]) {
       i++;
       try {
-        const resolvido = await resolveGalleryDownload(midia, galeria.watermark_previews, galeria.photographer_id);
+        const resolvido = await resolveGalleryDownload(midia, false, galeria.photographer_id);
         if (!resolvido) continue;
         const nome = `foto-${String(i).padStart(3, "0")}${"fileName" in resolvido ? extensaoDe(resolvido.fileName) : ".jpg"}`;
         if ("url" in resolvido) {

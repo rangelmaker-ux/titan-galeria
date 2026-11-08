@@ -89,7 +89,7 @@ export default async function GaleriaPage({ params }: { params: { id: string } }
       <section className="flex flex-wrap items-center gap-4">
         <Uploader
           galleryId={galeria.id}
-          watermark={galeria.watermark_previews ? (fotografo?.watermark_logo_url ? {
+          watermark={galeria.watermark_previews && !galeria.allow_downloads ? (fotografo?.watermark_logo_url ? {
             logoUrl: fotografo.watermark_logo_url,
             posX: fotografo.watermark_pos_x ?? 50,
             posY: fotografo.watermark_pos_y ?? 50,
