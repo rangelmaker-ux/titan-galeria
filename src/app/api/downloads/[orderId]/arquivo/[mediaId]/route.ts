@@ -18,7 +18,7 @@ export async function GET(
 
   const { data: order } = await supabase
     .from("orders")
-    .select("id, status, gallery_id, payment_method, access_token_hash, galleries(photographer_id, watermark_previews)")
+    .select("id, status, gallery_id, payment_method, access_token_hash, galleries(photographer_id)")
     .eq("id", params.orderId)
     .single();
   if (!order || !["paid", "fulfilled"].includes(order.status) || !canReadOrder(req, order)) {
@@ -42,18 +42,8 @@ export async function GET(
     .single();
   if (!midia) return NextResponse.json({ error: "arquivo não encontrado" }, { status: 404 });
 
-  // Marca d'água ligada nessa galeria = o máximo que libera é a prévia (menor
-  // resolução, com marca). Desligada = original em alta resolução, sem marca.
-  // Isso lê o estado ATUAL da galeria a cada download — então ligar/desligar
-  // vale na hora pra tudo que já está na galeria, sem precisar reprocessar
-  // nenhuma foto enviada antes.
-  const galeriaInfoWatermark = Array.isArray(order.galleries) ? order.galleries[0] : order.galleries;
-  const marcaDaguaAtiva = (galeriaInfoWatermark as { watermark_previews?: boolean } | undefined)?.watermark_previews;
-  if (marcaDaguaAtiva) {
-    if (!midia.r2_key_preview) return NextResponse.json({ error: "prévia indisponível" }, { status: 404 });
-    const { publicPreviewUrl } = await import("@/lib/r2");
-    return NextResponse.redirect(publicPreviewUrl(midia.r2_key_preview));
-  }
+  // Pedido pago: sempre o ORIGINAL, sem marca d'água (a marca só existe nas
+  // prévias de venda, nunca em arquivo entregue).
 
   if (!midia.drive_file_id) {
     // mídia antiga, enviada antes da migração pro Drive — ainda no R2.
