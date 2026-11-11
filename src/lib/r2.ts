@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { createHmac } from "node:crypto";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /** Cloudflare R2 é compatível com a API S3 — usamos o SDK da AWS apontando
@@ -68,6 +69,48 @@ export async function storePublicImage(key: string, body: Uint8Array, contentTyp
 export function publicPreviewUrl(key: string) {
   const base = process.env.R2_PUBLIC_BASE_URL!; // ex: https://media.titangaleria.com
   return `${base.replace(/\/$/, "")}/${key}`;
+}
+
+/** Larguras aceitas pra versão de EXIBIÇÃO (sem marca d'água) das galerias
+ * de entrega gratuita. Lista fechada de propósito: cada largura nova obriga
+ * o servidor a puxar o original do Drive uma vez, então não pode ser livre. */
+export const DISPLAY_WIDTHS = [800, 1600, 2400] as const;
+export function displayWidth(requested: number): number {
+  return DISPLAY_WIDTHS.find((w) => w >= requested) ?? DISPLAY_WIDTHS[DISPLAY_WIDTHS.length - 1];
+}
+
+/** Chave no bucket PÚBLICO da versão de exibição já redimensionada. O nome
+ * leva um HMAC (com segredo do servidor) pra não ser adivinhável a partir
+ * dos IDs — a cópia sem marca d'água só é achada por quem recebe o
+ * redirecionamento da rota da galeria. */
+export function displayKey(galleryId: string, mediaId: string, width: number) {
+  const sig = createHmac("sha256", process.env.SUPABASE_SERVICE_ROLE_KEY!).update(`exibicao:${mediaId}:${width}`).digest("hex").slice(0, 32);
+  return `galerias/${galleryId}/exibicao/${sig}.jpg`;
+}
+
+export async function publicObjectExists(key: string): Promise<boolean> {
+  try {
+    await r2.send(new HeadObjectCommand({ Bucket: PUBLIC_BUCKET, Key: key }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Apaga as versões de exibição de UMA mídia (todas as larguras). */
+export async function deleteDisplayCopies(galleryId: string, mediaId: string) {
+  await Promise.all(DISPLAY_WIDTHS.map((w) => deletePreview(displayKey(galleryId, mediaId, w)).catch(() => {})));
+}
+
+/** Apaga todas as versões de exibição de uma galeria (ao excluir a galeria). */
+export async function deleteGalleryDisplayCopies(galleryId: string) {
+  const prefix = `galerias/${galleryId}/exibicao/`;
+  let token: string | undefined;
+  do {
+    const page = await r2.send(new ListObjectsV2Command({ Bucket: PUBLIC_BUCKET, Prefix: prefix, ContinuationToken: token }));
+    await Promise.all((page.Contents ?? []).map((o) => (o.Key ? deletePreview(o.Key).catch(() => {}) : undefined)));
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
 }
 
 export function mediaKey(galleryId: string, fileName: string, variant: "original" | "preview") {

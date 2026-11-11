@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { fetchDriveFileStream, getDriveFileMeta } from "@/lib/drive";
 import { getDriveAccount } from "@/lib/drive-account";
 import { canReadOrder } from "@/lib/order-access";
+import { directOriginalUrl } from "@/lib/gallery-download";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // vídeos grandes podem demorar mais pra passar pelo proxy
@@ -58,6 +59,15 @@ export async function GET(
   try {
     const galeriaInfo = Array.isArray(order.galleries) ? order.galleries[0] : order.galleries;
     const photographerId = (galeriaInfo as { photographer_id: string } | undefined)?.photographer_id;
+
+    // Pagamento já conferido acima: entrega direto do Drive do fotógrafo, sem
+    // os bytes passarem pelo nosso servidor. Se o Drive recusar o link
+    // público, segue pro proxy antigo logo abaixo.
+    if (photographerId) {
+      const direto = await directOriginalUrl(midia, photographerId);
+      if (direto) return NextResponse.redirect(direto);
+    }
+
     const account = photographerId ? await getDriveAccount(photographerId) : {};
     const [meta, fileRes] = await Promise.all([
       getDriveFileMeta(account, midia.drive_file_id),

@@ -172,6 +172,65 @@ export async function getDriveFileMeta(account: DriveAccount, fileId: string) {
   return res.json() as Promise<{ name: string; mimeType: string; size?: string }>;
 }
 
+/** Link de download servido pelo PRÓPRIO Google Drive do fotógrafo — os
+ * bytes vão direto do Drive pro cliente, sem passar pelo nosso servidor
+ * (era isso que estourava a cota de transferência da hospedagem). Só
+ * funciona depois de `setDriveLinkSharing(..., true)` no arquivo ou na
+ * pasta que o contém. */
+export function driveFileDownloadUrl(fileId: string) {
+  return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
+}
+
+/** Página da pasta no Drive — o próprio Google oferece "Fazer download"
+ * da pasta inteira em .zip, sem custo de tráfego pra nós. */
+export function driveFolderUrl(folderId: string) {
+  return `https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}`;
+}
+
+/** IDs de tudo que está DIRETAMENTE dentro de uma pasta (arquivos e
+ * subpastas, fora a lixeira) que a plataforma consegue ver. Usado pra
+ * conferir que a pasta só tem fotos da galeria antes de compartilhá-la. */
+export async function listDriveFolderChildren(account: DriveAccount, folderId: string): Promise<string[]> {
+  const token = await getAccessToken(account.refreshToken);
+  const ids: string[] = [];
+  let pageToken: string | undefined;
+  do {
+    const q = encodeURIComponent(`'${folderId.replace(/'/g, "\\'")}' in parents and trashed = false`);
+    const res = await fetch(
+      `${DRIVE_API}/files?q=${q}&fields=nextPageToken,files(id)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) throw new Error("falha ao listar pasta no Drive: " + (await res.text()));
+    const data = await res.json();
+    for (const f of data.files ?? []) ids.push(f.id);
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+  return ids;
+}
+
+/** Liga ou desliga o acesso "qualquer pessoa com o link" (somente leitura)
+ * num arquivo/pasta que a plataforma criou no Drive do fotógrafo. Ligar é
+ * idempotente (o Drive reaproveita a mesma permissão). Lança erro se o Drive
+ * recusar — ex: conta Google Workspace cujo administrador bloqueia
+ * compartilhamento público; quem chamar deve cair no proxy antigo. */
+export async function setDriveLinkSharing(account: DriveAccount, fileId: string, enabled: boolean) {
+  const token = await getAccessToken(account.refreshToken);
+  if (enabled) {
+    const res = await fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}/permissions?supportsAllDrives=true&fields=id`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ role: "reader", type: "anyone", allowFileDiscovery: false }),
+    });
+    if (!res.ok) throw new Error("falha ao liberar link no Drive: " + (await res.text()));
+    return;
+  }
+  const res = await fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}/permissions/anyoneWithLink?supportsAllDrives=true`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok && res.status !== 404) throw new Error("falha ao revogar link no Drive: " + (await res.text()));
+}
+
 export async function deleteDriveFile(account: DriveAccount, fileId: string) {
   const token = await getAccessToken(account.refreshToken);
   await fetch(`${DRIVE_API}/files/${fileId}`, {

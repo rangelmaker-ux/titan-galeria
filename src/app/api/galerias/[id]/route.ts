@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { createClient } from "@/lib/supabase/server";
-import { deletePreview } from "@/lib/r2";
-import { deleteDriveFolder } from "@/lib/drive";
+import { deletePreview, deleteGalleryDisplayCopies } from "@/lib/r2";
+import { deleteDriveFolder, setDriveLinkSharing } from "@/lib/drive";
 import { getDriveAccount } from "@/lib/drive-account";
 
 const coverSchema = z.object({
@@ -82,7 +82,29 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .eq("photographer_id", user.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // Download gratuito desligado: tira o "qualquer pessoa com o link" que o
+  // download direto do Drive liga na pasta e nos arquivos da galeria. Pedido
+  // pago continua funcionando — a rota do pedido religa o link do arquivo
+  // comprado na hora do download, depois de conferir o pagamento.
+  if (allowDownloads === false) {
+    await revokeDriveLinks(supabase, params.id, user.id).catch((e) =>
+      console.error("[galeria] falha ao revogar links do Drive", params.id, e?.message)
+    );
+  }
   return NextResponse.json({ ok: true });
+}
+
+async function revokeDriveLinks(supabase: ReturnType<typeof createClient>, galleryId: string, photographerId: string) {
+  const { data: galeria } = await supabase.from("galleries").select("drive_folder_id").eq("id", galleryId).eq("photographer_id", photographerId).single();
+  if (!galeria) return;
+  const { data: midias } = await supabase.from("media").select("drive_file_id").eq("gallery_id", galleryId).not("drive_file_id", "is", null);
+  const account = await getDriveAccount(photographerId);
+  const ids = [galeria.drive_folder_id, ...(midias ?? []).map((m) => m.drive_file_id)].filter((id): id is string => !!id);
+  // poucos por vez, pra não esbarrar no limite de requisições do Drive.
+  for (let i = 0; i < ids.length; i += 8) {
+    await Promise.all(ids.slice(i, i + 8).map((id) => setDriveLinkSharing(account, id, false).catch(() => {})));
+  }
 }
 
 /** Arquiva a galeria em vez de apagar a linha: um DELETE de verdade apagaria
@@ -123,6 +145,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   for (const m of midias ?? []) {
     if (m.r2_key_preview) deletePreview(m.r2_key_preview).catch(() => {});
   }
+  deleteGalleryDisplayCopies(params.id).catch(() => {});
   if (galeria.drive_folder_id) {
     getDriveAccount(user.id)
       .then((account) => deleteDriveFolder(account, galeria.drive_folder_id!))

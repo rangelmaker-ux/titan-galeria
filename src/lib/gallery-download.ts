@@ -1,6 +1,29 @@
-import { fetchDriveFileStream, getDriveFileMeta } from "./drive";
+import { fetchDriveFileStream, getDriveFileMeta, setDriveLinkSharing, driveFileDownloadUrl } from "./drive";
 import { getDriveAccount } from "./drive-account";
 import { publicPreviewUrl, createDownloadUrl } from "./r2";
+
+/** Link pro cliente baixar o ORIGINAL direto da origem — o Drive do próprio
+ * fotógrafo (liberando "qualquer pessoa com o link" só naquele arquivo) ou
+ * a URL assinada do R2 pras mídias antigas —, sem os bytes passarem pelo
+ * nosso servidor. Devolve null se o Drive recusar o compartilhamento (ex:
+ * conta Workspace bloqueada); aí quem chamar usa o proxy antigo, então
+ * nenhum fotógrafo fica sem entregar. */
+export async function directOriginalUrl(
+  midia: Pick<DownloadableMedia, "drive_file_id" | "r2_key_original">,
+  photographerId: string
+): Promise<string | null> {
+  if (!midia.drive_file_id) {
+    return midia.r2_key_original ? createDownloadUrl(midia.r2_key_original) : null;
+  }
+  try {
+    const account = await getDriveAccount(photographerId);
+    await setDriveLinkSharing(account, midia.drive_file_id, true);
+    return driveFileDownloadUrl(midia.drive_file_id);
+  } catch (e: any) {
+    console.error("[download] link direto do Drive indisponível; usando proxy", midia.drive_file_id, e?.message);
+    return null;
+  }
+}
 
 export type DownloadableMedia = {
   id: string;
